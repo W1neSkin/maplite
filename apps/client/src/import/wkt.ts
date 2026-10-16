@@ -1,4 +1,15 @@
-import { defaultOperationFor, profileByEpsg, profilesForDatum, type CoordinateOperation, type CrsProfile, type EastingNotation } from "@cartography/geo-core"
+import { defaultOperationFor, profileByEpsg, profileById, profilesForDatum, type CoordinateOperation, type CrsProfile, type EastingNotation } from "@cartography/geo-core"
+
+export type CrsChoice =
+  | { kind: "wgs84" }
+  | { kind: "zone"; datum: "SK42" | "SK95" | "GSK2011"; zone: number; notation?: EastingNotation }
+
+export function choiceToPrj(choice: CrsChoice): PrjDecision {
+  if (choice.kind === "wgs84") return { kind: "wgs84" }
+  const profile = profileById(`${choice.datum.toLowerCase()}-gk6-z${choice.zone}`)
+  if (!profile) return { kind: "blocked", code: "unknown" }
+  return { kind: "projected", profile, operation: defaultOperationFor(profile.datum), notation: choice.notation ?? "full" }
+}
 
 export type PrjDecision =
   | { kind: "wgs84" }

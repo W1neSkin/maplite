@@ -2,7 +2,25 @@ import { projectedToCrs84, sourceGeographicToCrs84 } from "@cartography/geo-core
 import { unzipSync } from "fflate"
 import type { Crs84Geometry } from "@cartography/project-schema"
 import { hasHighBytes, readDbf, readShp, type RawGeometry } from "./shp.js"
-import { classifyPrj, type PrjDecision } from "./wkt.js"
+import { choiceToPrj, classifyPrj, type CrsChoice, type PrjDecision } from "./wkt.js"
+
+export type { CrsChoice }
+
+export type LoadOptions = {
+  only?: string
+  choice?: CrsChoice
+  allowHeight?: boolean
+  encoding?: string
+}
+
+export type ImportDecide = {
+  kind: "decide"
+  name: string
+  count: number
+  needsCrs: boolean
+  needsHeight: boolean
+  needsEncoding: boolean
+}
 
 const MAX_RECORDS = 2000
 const NAME_KEYS = ["name", "Name", "NAME", "label", "LABEL", "title", "TITLE"]
@@ -29,7 +47,7 @@ export type ImportReady = {
   profileId: string | null
 }
 
-export type ImportOutcome = ImportReady | { kind: "blocked"; code: ImportCode; count?: number } | { kind: "choose"; names: string[] }
+export type ImportOutcome = ImportReady | ImportDecide | { kind: "blocked"; code: ImportCode; count?: number } | { kind: "choose"; names: string[] }
 
 type Group = { name: string; shp?: Uint8Array; dbf?: Uint8Array; prj?: string; cpg?: string }
 
@@ -96,14 +114,18 @@ function convertGeometry(decision: PrjDecision, geometry: RawGeometry): { geomet
   return { geometry: { type: "Polygon", coordinates: coordinates as [number, number][][] }, outside }
 }
 
-function fromShapefile(group: Group): ImportOutcome {
+function fromShapefile(group: Group, options: LoadOptions = {}): ImportOutcome {
   if (!group.shp) return { kind: "blocked", code: "format" }
-  const decision = classifyPrj(group.prj)
-  if (decision.kind === "blocked") return { kind: "blocked", code: decision.code === "missing" ? "missing" : "unknown" }
-  const encoding = group.cpg || "utf-8"
-  if (!group.cpg && group.dbf && hasHighBytes(group.dbf)) return { kind: "blocked", code: "encoding" }
   const shp = readShp(group.shp)
-  if (shp.height) return { kind: "blocked", code: "height" }
+  const needsCrs = !group.prj && !options.choice
+  const needsHeight = shp.height && !options.allowHeight
+  const needsEncoding = !group.cpg && !options.encoding && !!group.dbf && hasHighBytes(group.dbf)
+  if (needsCrs || needsHeight || needsEncoding) {
+    return { kind: "decide", name: group.name, count: shp.records.length, needsCrs, needsHeight, needsEncoding }
+  }
+  const decision = options.choice ? choiceToPrj(options.choice) : classifyPrj(group.prj)
+  if (decision.kind === "blocked") return { kind: "blocked", code: decision.code === "missing" ? "missing" : "unknown" }
+  const encoding = options.encoding || group.cpg || "utf-8"
   const rows = group.dbf ? readDbf(group.dbf, encoding) : []
   if (shp.records.length > MAX_RECORDS) return { kind: "blocked", code: "too-big", count: MAX_RECORDS }
   const features: ImportFeature[] = []
@@ -142,7 +164,7 @@ function fromShapefile(group: Group): ImportOutcome {
   }
 }
 
-export function loadBytes(name: string, bytes: Uint8Array, only?: string): ImportOutcome {
+export function loadBytes(name: string, bytes: Uint8Array, options: LoadOptions = {}): ImportOutcome {
   if (/\.geojson$/i.test(name) || /\.json$/i.test(name)) return fromGeoJson(name, text(bytes))
   let files: Record<string, Uint8Array>
   try {
@@ -152,10 +174,10 @@ export function loadBytes(name: string, bytes: Uint8Array, only?: string): Impor
   }
   const groups = groupsOf(files)
   if (groups.length === 0) return { kind: "blocked", code: "format" }
-  if (!only && groups.length > 1) return { kind: "choose", names: groups.map((group) => group.name) }
-  const group = groups.find((item) => item.name === only) ?? groups[0]
+  if (!options.only && groups.length > 1) return { kind: "choose", names: groups.map((group) => group.name) }
+  const group = groups.find((item) => item.name === options.only) ?? groups[0]
   if (!group) return { kind: "blocked", code: "format" }
-  return fromShapefile(group)
+  return fromShapefile(group, options)
 }
 
 function pair(value: unknown): [number, number] | null {

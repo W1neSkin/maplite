@@ -59,21 +59,27 @@ export function readShp(bytes: Uint8Array): { height: boolean; records: ShpRecor
   const view = viewOf(bytes)
   if (bytes.byteLength < 100 || view.getInt32(0, false) !== 9994) throw new Error("format")
   const shapeType = view.getInt32(32, true)
-  if (HEIGHT_TYPES.has(shapeType)) return { height: true, records: [] }
   const records: ShpRecord[] = []
   let offset = 100
   while (offset + 8 <= bytes.byteLength) {
     const words = view.getInt32(offset + 4, false)
     if (words <= 0) break
     const content = offset + 8
-    const type = view.getInt32(content, true)
+    const type = flatType(view.getInt32(content, true))
     if (type === 1) records.push({ geometries: [{ type: "Point", coordinates: [view.getFloat64(content + 4, true), view.getFloat64(content + 12, true)] }] })
     else if (type === 3) records.push({ geometries: readParts(view, content).map((part) => ({ type: "LineString", coordinates: part })) })
     else if (type === 5) records.push({ geometries: polygonsOf(readParts(view, content)) })
     else records.push({ geometries: [] })
     offset = content + words * 2
   }
-  return { height: false, records }
+  return { height: HEIGHT_TYPES.has(shapeType), records }
+}
+
+function flatType(type: number): number {
+  if (type === 11 || type === 21) return 1
+  if (type === 13 || type === 23) return 3
+  if (type === 15 || type === 25) return 5
+  return type
 }
 
 type Field = { name: string; type: string; length: number; offset: number }

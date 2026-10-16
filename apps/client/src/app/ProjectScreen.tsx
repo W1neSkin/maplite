@@ -250,7 +250,12 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
           {outcome ? (
             <ImportBody
               outcome={outcome}
-              onChoose={(name) => { const bytes = zipRef.current; if (bytes) setOutcome(loadBytes("archive.zip", bytes, name)) }}
+              onChoose={(name) => { const bytes = zipRef.current; if (bytes) setOutcome(loadBytes("archive.zip", bytes, { only: name })) }}
+              onDecide={(options) => {
+                const bytes = zipRef.current
+                if (!bytes || outcome.kind !== "decide") return
+                setOutcome(loadBytes("archive.zip", bytes, { only: outcome.name, ...options }))
+              }}
               onConfirm={() => {
                 if (outcome.kind !== "ready") return
                 void project.importLayer(outcome).then((id) => {

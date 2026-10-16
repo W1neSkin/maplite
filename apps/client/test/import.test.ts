@@ -64,6 +64,38 @@ describe("classifyPrj", () => {
 })
 
 describe("loadBytes", () => {
+  it("asks for a coordinate system when the archive has no prj", () => {
+    const zip = zipSync({ "gate.shp": pointShp(-0.16, 51.51), "gate.dbf": nameDbf("Gate"), "gate.cpg": strToU8("UTF-8") })
+    const asked = loadBytes("gate.zip", zip)
+    expect(asked).toMatchObject({ kind: "decide", needsCrs: true, needsHeight: false })
+    const loaded = loadBytes("gate.zip", zip, { choice: { kind: "wgs84" } })
+    expect(loaded.kind).toBe("ready")
+    if (loaded.kind !== "ready") return
+    expect(loaded.features[0]?.name).toBe("Gate")
+  })
+
+  it("imports horizontal coordinates after the height warning is accepted", () => {
+    const bytes = new Uint8Array(136)
+    const view = new DataView(bytes.buffer)
+    view.setInt32(0, 9994, false)
+    view.setInt32(24, bytes.byteLength / 2, false)
+    view.setInt32(28, 1000, true)
+    view.setInt32(32, 11, true)
+    view.setInt32(100, 1, false)
+    view.setInt32(104, 14, false)
+    view.setInt32(108, 11, true)
+    view.setFloat64(112, 10, true)
+    view.setFloat64(120, 20, true)
+    view.setFloat64(128, 100, true)
+    const zip = zipSync({ "gate.shp": bytes, "gate.prj": strToU8(WGS84) })
+    const asked = loadBytes("gate.zip", zip)
+    expect(asked).toMatchObject({ kind: "decide", needsHeight: true })
+    const loaded = loadBytes("gate.zip", zip, { allowHeight: true })
+    expect(loaded.kind).toBe("ready")
+    if (loaded.kind !== "ready") return
+    expect(loaded.features[0]?.geometry.coordinates).toEqual([10, 20])
+  })
+
   it("reads a WGS 84 point and keeps its name", () => {
     const loaded = loadBytes("gate.zip", archive(WGS84, -0.16, 51.51))
     expect(loaded.kind).toBe("ready")
