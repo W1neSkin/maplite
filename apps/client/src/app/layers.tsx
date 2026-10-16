@@ -5,6 +5,8 @@ import type { MapFeature, MapLayer } from "./model.js"
 import { CheckIcon, CloseIcon, ControlIcon, ExportIcon, EyeIcon, EyeOffIcon, GeometryGlyph, GripIcon, GroupIcon, IconButton, ImportIcon, LayerIcon, PencilIcon, PinIcon, SendIcon, TrashIcon } from "./icons.js"
 import type { MapGroup } from "./model.js"
 import { FieldTools } from "./field-tools.js"
+import { LIVE_DEVICE_LAYER, LiveLayerBody, LiveLayerRow } from "./live-layer.js"
+import type { LivePerson } from "./use-live.js"
 
 type LayerBrowserProps = {
   layers: readonly MapLayer[]
@@ -30,6 +32,8 @@ type LayerBrowserProps = {
   onAverage: () => void
   onBuildLine: () => void
   onBuildPolygon: () => void
+  livePeople: readonly LivePerson[]
+  onTogglePerson: (id: string) => void
 }
 
 function buckets(layers: readonly MapLayer[], groups: readonly MapGroup[]) {
@@ -41,9 +45,17 @@ function buckets(layers: readonly MapLayer[], groups: readonly MapGroup[]) {
 export function LayerBrowser(props: LayerBrowserProps) {
   const [query, setQuery] = useState("")
   const layer = props.layers.find((item) => item.id === props.openLayerId) ?? null
+  if (props.openLayerId === LIVE_DEVICE_LAYER) {
+    return <LiveLayerBody people={props.livePeople} onToggle={props.onTogglePerson} />
+  }
   if (!layer) {
     return (
       <div className="flex flex-col gap-1">
+        {props.livePeople.length > 0 ? (
+          <ul className="flex flex-col">
+            <LiveLayerRow count={props.livePeople.length} hidden={props.hidden.has(LIVE_DEVICE_LAYER)} onToggle={() => props.onToggleVisible(LIVE_DEVICE_LAYER)} onOpen={() => props.onOpenLayer(LIVE_DEVICE_LAYER)} />
+          </ul>
+        ) : null}
         {buckets(props.layers, props.groups).map((section) => (
           <div key={section.id ?? "none"}>
             <div className="px-1 text-[11px] uppercase tracking-wide text-neutral-400">{section.name}</div>

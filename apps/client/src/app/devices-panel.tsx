@@ -4,8 +4,7 @@ import { t } from "../i18n/translate.js"
 import { createEnrollment, readDevices, redeemCode, removeDevice, type DeviceRow } from "../sync/channel.js"
 import { clientId, saveSession, type Session } from "./connection.js"
 import { BasemapPack } from "./basemap-pack.js"
-import { EyeIcon, EyeOffIcon, IconButton, PlusIcon, TrashIcon } from "./icons.js"
-import type { LivePerson } from "./use-live.js"
+import { IconButton, PlusIcon, TrashIcon } from "./icons.js"
 import { deviceLabel, rememberDeviceLabel } from "./use-live.js"
 
 export function DevicesPanel(props: {
@@ -13,8 +12,6 @@ export function DevicesPanel(props: {
   surface: "main" | "device"
   sharing: boolean
   onSharing: (value: boolean) => void
-  people: readonly LivePerson[]
-  onTogglePerson: (id: string) => void
   onJoined: (session: Session) => void
 }) {
   const [devices, setDevices] = useState<DeviceRow[]>([])
@@ -104,17 +101,6 @@ export function DevicesPanel(props: {
           {joinFailed ? <p className="text-xs text-neutral-500">{t("joinFailed")}</p> : null}
         </form>
       ) : null}
-      {props.people.length > 0 ? <div className="px-1 text-[11px] uppercase tracking-wide text-neutral-400">{t("liveTitle")}</div> : null}
-      <ul className="flex flex-col">
-        {props.people.map((person) => (
-          <li key={person.id} className="flex items-center">
-            <IconButton aria-label={person.shown ? t("hideLayer") : t("showLayer")} title={person.shown ? t("hideLayer") : t("showLayer")} onClick={() => props.onTogglePerson(person.id)}>
-              {person.shown ? <EyeIcon /> : <EyeOffIcon />}
-            </IconButton>
-            <span className="min-w-0 flex-1 truncate text-sm">{person.name}</span>
-          </li>
-        ))}
-      </ul>
     </div>
   )
 }

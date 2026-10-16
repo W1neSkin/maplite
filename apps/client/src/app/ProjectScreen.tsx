@@ -25,6 +25,7 @@ import { saveZip } from "../import/save-zip.js"
 import { layerZip } from "../import/write-shp.js"
 import { formatLength } from "../i18n/format.js"
 import { t } from "../i18n/translate.js"
+import { LIVE_COLOR, LIVE_DEVICE_LAYER } from "./live-layer.js"
 import { labelFields, LayerStyle } from "./layer-style.js"
 import { LayerActions, LayerBrowser } from "./layers.js"
 import { groupedIds } from "./order.js"
@@ -49,6 +50,13 @@ function measurePadding(stage: HTMLElement, sheet: HTMLElement, dock: HTMLElemen
   return paddingFromOverlays(boxOf(stage.getBoundingClientRect()), overlays)
 }
 
+function liveAgeText(receivedAt: string): string {
+  const seconds = Math.round((Date.now() - Date.parse(receivedAt)) / 1000)
+  if (!Number.isFinite(seconds) || seconds < 10) return t("liveJustNow")
+  if (seconds < 60) return t("liveSecondsAgo", { n: seconds })
+  return t("liveMinutesAgo", { n: Math.max(1, Math.round(seconds / 60)) })
+}
+
 function nameOf(payload: unknown): string {
   if (!payload || typeof payload !== "object") return ""
   const name = (payload as { properties?: { name?: unknown } }).properties?.name
@@ -68,6 +76,7 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
   const [locationOff, setLocationOff] = useState(false)
   const [locating, setLocating] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
+  const [liveId, setLiveId] = useState<string | null>(null)
   const [sheet, setSheet] = useState(false)
   const [openLayerId, setOpenLayerId] = useState<string | null>(null)
   const [placingLayerId, setPlacingLayerId] = useState<string | null>(null)
@@ -335,18 +344,22 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
     }
   }
   const rulerLabel = ruler.length >= 2 ? t("featureLength", { value: formatLength(geodesicLength(ruler)) }) : t("measureHint")
-  const callout = selected && !placingLayerId && !measuring && !hidden.has(selected.layerId)
+  const liveMark = live.markers.find((marker) => marker.id === liveId) ?? null
+  const liveAge = liveMark ? liveAgeText(liveMark.receivedAt) : ""
+  const callout = liveMark && !placingLayerId && !measuring
+    ? { coordinate: liveMark.coordinate, title: liveMark.name, layer: t("liveCallout", { age: liveAge }) }
+    : selected && !placingLayerId && !measuring && !hidden.has(selected.layerId)
     ? { coordinate: anchorOf(selected.geometry), title: selected.name, layer: project.model.layers.find((layer) => layer.id === selected.layerId)?.name ?? "" }
     : null
 
   return (
     <div ref={stageRef} className={surface === "device" ? "map-phone relative h-full" : "relative h-full"}>
-      <Legend layers={shownLayers} hidden={hidden} />
+      <Legend layers={live.people.length > 0 ? [...shownLayers, { id: LIVE_DEVICE_LAYER, name: t("liveTitle"), geometryType: "Point", color: LIVE_COLOR, fillOpacity: 0, labelAttribute: null, groupId: null, count: live.people.length, delivery: null }] : shownLayers} hidden={hidden} />
       {live.sharing ? <p role="status" className="absolute left-1/2 top-[max(8px,env(safe-area-inset-top))] z-20 -translate-x-1/2 rounded-full bg-neutral-900 px-3 py-1 text-xs text-white">{t("sharingLive")}</p> : null}
       <MapView
         ref={mapRef}
         features={project.model.features.filter((feature) => shownIds.has(feature.layerId) && !hidden.has(feature.layerId))}
-        live={live.markers}
+        live={hidden.has(LIVE_DEVICE_LAYER) ? [] : live.markers}
         selectedId={selectedId}
         placing={placingLayerId !== null || measuring || controlPick}
         callout={callout}
@@ -371,7 +384,8 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
         }}
         onCursor={setCursor}
         onLocated={setCursor}
-        onSelect={(id) => { if (id) selectFeature(id); else setSelectedId(null) }}
+        onSelect={(id) => { setLiveId(null); if (id) selectFeature(id); else setSelectedId(null) }}
+        onLive={(id) => { setSelectedId(null); setLiveId(id) }}
         onGeometry={(id, geometry) => {
           const feature = project.model.features.find((item) => item.id === id)
           const layer = project.model.layers.find((item) => item.id === feature?.layerId)
@@ -407,7 +421,7 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
       {sheet && !placingLayerId ? (
         <Sheet
           ref={sheetRef}
-          title={outcome ? t("importData") : devicesOpen ? t("settings") : sendLayerId ? t("sendLayer") : controlsOpen ? t("controlPoints") : openLayer ? openLayer.name : t("layersTitle")}
+          title={outcome ? t("importData") : devicesOpen ? t("settings") : sendLayerId ? t("sendLayer") : controlsOpen ? t("controlPoints") : openLayerId === LIVE_DEVICE_LAYER ? t("liveTitle") : openLayer ? openLayer.name : t("layersTitle")}
           onClose={() => { if (outcome) { setOutcome(null); return }; if (devicesOpen) { setDevicesOpen(false); return }; if (sendLayerId) { setSendLayerId(null); return }; if (openLayerId) setOpenLayerId(null); else setSheet(false) }}
           onRename={!outcome && !devicesOpen && !sendLayerId && openLayer && !openLayer.delivery ? (name) => void project.renameLayer(openLayer.id, name) : undefined}
           actions={!outcome && !devicesOpen && !sendLayerId && openLayer ? (
@@ -434,8 +448,6 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
               surface={surface}
               sharing={live.sharing}
               onSharing={live.setSharing}
-              people={live.people}
-              onTogglePerson={live.togglePerson}
               onJoined={onJoined}
             />
           ) : sendLayerId && !outcome ? (
@@ -528,6 +540,8 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
             onAverage={() => void averageHere()}
             onBuildLine={() => void buildShape("LineString")}
             onBuildPolygon={() => void buildShape("Polygon")}
+            livePeople={live.people}
+            onTogglePerson={live.togglePerson}
           />
           </>
           )}

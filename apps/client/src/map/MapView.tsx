@@ -32,7 +32,7 @@ import { attachVertexEdit } from "./vertex-edit.js"
 
 export type MapCallout = { coordinate: [number, number]; title: string; layer: string }
 
-export type LiveMarker = { id: string; name: string; coordinate: [number, number]; faded: boolean; courseDeg?: number | null; trail?: readonly [number, number][] }
+export type LiveMarker = { id: string; name: string; coordinate: [number, number]; faded: boolean; courseDeg?: number | null; trail?: readonly [number, number][]; receivedAt?: string }
 
 export type MapHandle = {
   fit(): void
@@ -52,6 +52,7 @@ type MapViewProps = {
   onBasemapFailed: (failed: boolean) => void
   onCenter?: (coordinate: [number, number]) => void
   onSelect?: (featureId: string | null) => void
+  onLive?: (id: string | null) => void
   onPlace?: (coordinate: [number, number]) => void
   onCursor?: (coordinate: [number, number]) => void
   onLocated?: (coordinate: [number, number]) => void
@@ -133,7 +134,7 @@ function showFeature(map: Map, source: VectorSource, id: string, padding: [numbe
   view.fit(extent, { padding: fitted, maxZoom: typeof zoom === "number" ? zoom : 16, duration: 180, size })
 }
 
-export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ features, selectedId = null, placing = false, callout = null, projectionId = null, draft = null, live = [], onBasemapFailed, onSelect, onPlace, onCursor, onLocated, onCenter, onGeometry }, ref) {
+export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ features, selectedId = null, placing = false, callout = null, projectionId = null, draft = null, live = [], onBasemapFailed, onSelect, onLive, onPlace, onCursor, onLocated, onCenter, onGeometry }, ref) {
   const target = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
   const sourceRef = useRef<VectorSource | null>(null)
@@ -142,6 +143,7 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
   const calloutOverlay = useRef<Overlay | null>(null)
   const calloutElement = useRef<HTMLDivElement | null>(null)
   const selectRef = useRef(onSelect)
+  const liveSelectRef = useRef(onLive)
   const placeRef = useRef(onPlace)
   const cursorRef = useRef(onCursor)
   const locatedRef = useRef(onLocated)
@@ -153,6 +155,7 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
   const hereLonLat = useRef<[number, number] | null>(null)
   const [rotation, setRotation] = useState(0)
   selectRef.current = onSelect
+  liveSelectRef.current = onLive
   placeRef.current = onPlace
   cursorRef.current = onCursor
   locatedRef.current = onLocated
@@ -273,12 +276,25 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
         }
       }
       let found: string | null = null
-      map.forEachFeatureAtPixel(event.pixel, (feature) => {
+      let liveId: string | null = null
+      map.forEachFeatureAtPixel(event.pixel, (feature, layer) => {
+        if (layer?.get("kind") === "live") {
+          const id = feature.get("liveId")
+          if (typeof id !== "string") return undefined
+          liveId = id
+          return id
+        }
         const id = feature.getId()
         if (typeof id !== "string") return undefined
         found = id
         return id
-      }, { hitTolerance: HIT_TOLERANCE, layerFilter: (layer) => layer.get("kind") !== "here" && layer.get("kind") !== "live" })
+      }, { hitTolerance: HIT_TOLERANCE, layerFilter: (layer) => layer.get("kind") !== "here" })
+      if (liveId) {
+        selectRef.current?.(null)
+        liveSelectRef.current?.(liveId)
+        return
+      }
+      liveSelectRef.current?.(null)
       selectRef.current?.(found)
     }
     map.on("singleclick", onClick)
@@ -389,6 +405,7 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
         source.addFeature(line)
       }
       const feature = new Feature(new Point(transform(marker.coordinate, "EPSG:4326", projection)))
+      feature.set("liveId", marker.id)
       feature.set("name", marker.name)
       feature.set("faded", marker.faded)
       if (typeof marker.courseDeg === "number") feature.set("courseDeg", marker.courseDeg)

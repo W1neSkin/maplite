@@ -13,7 +13,7 @@ const FRESH_MS = 30_000
 const DROP_MS = 120_000
 const HEARTBEAT_MS = 20_000
 
-export type LiveMarker = { id: string; name: string; coordinate: [number, number]; faded: boolean; courseDeg: number | null; trail: [number, number][] }
+export type LiveMarker = { id: string; name: string; coordinate: [number, number]; faded: boolean; courseDeg: number | null; trail: [number, number][]; receivedAt: string }
 
 function trailOf(value: unknown): [number, number][] {
   if (!Array.isArray(value)) return []
@@ -76,6 +76,7 @@ function deviceMessages(messages: readonly LiveMessage[], now: number, hidden: R
       faded: age > FRESH_MS,
       courseDeg: typeof course === "number" && Number.isFinite(course) ? course : null,
       trail: trailOf(message.body.trail),
+      receivedAt: message.receivedAt,
     })
   }
   return { markers, people }
