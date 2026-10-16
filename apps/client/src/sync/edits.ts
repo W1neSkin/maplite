@@ -26,8 +26,8 @@ export function copyOperation(op: SyncOperation, entityId: string): SyncOperatio
   return { ...op, opId: crypto.randomUUID(), entityId, kind: "create", baseVersion: null, payload }
 }
 
-export function pushBody(operations: SyncOperation[]): PushRequest {
-  return { operations, schemaVersion: SCHEMA_VERSION }
+export function pushBody(operations: SyncOperation[], atomic = false): PushRequest {
+  return { operations, schemaVersion: SCHEMA_VERSION, ...(atomic ? { atomic: true } : {}) }
 }
 
 export type { PushResponse }

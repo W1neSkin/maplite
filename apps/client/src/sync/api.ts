@@ -37,12 +37,12 @@ export async function readAll(session: Session): Promise<{ entities: SnapshotEnt
   return { entities, watermark, schemaVersion }
 }
 
-export async function pushOps(session: Session, operations: SyncOperation[]): Promise<PushResponse> {
+export async function pushOps(session: Session, operations: SyncOperation[], atomic = false): Promise<PushResponse> {
   if (!session.projectId) throw new Error("server")
   const response = await fetch(`${session.server}/api/v1/projects/${session.projectId}/sync/push`, {
     method: "POST",
     headers: headers(session.token),
-    body: JSON.stringify(pushBody(operations)),
+    body: JSON.stringify(pushBody(operations, atomic)),
   })
   if (response.status === 401) throw new Error("auth")
   if (response.status === 409) throw new Error("upgrade")

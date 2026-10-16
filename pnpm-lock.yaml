@@ -35,6 +35,9 @@ importers:
       '@cartography/extension-example':
         specifier: workspace:*
         version: link:../../extensions/example
+      '@cartography/geo-core':
+        specifier: workspace:*
+        version: link:../../packages/geo-core
       '@cartography/project-schema':
         specifier: workspace:*
         version: link:../../packages/project-schema
@@ -47,6 +50,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      fflate:
+        specifier: ^0.8.3
+        version: 0.8.3
       ol:
         specifier: ^10.11.0
         version: 10.11.0

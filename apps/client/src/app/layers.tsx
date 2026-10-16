@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { t } from "../i18n/translate.js"
 import type { MapFeature, MapLayer } from "./model.js"
-import { CheckIcon, CloseIcon, EyeIcon, EyeOffIcon, GeometryGlyph, GripIcon, IconButton, PencilIcon, PinIcon, PlusIcon, TrashIcon } from "./icons.js"
+import { CheckIcon, CloseIcon, EyeIcon, EyeOffIcon, GeometryGlyph, GripIcon, IconButton, ImportIcon, PencilIcon, PinIcon, PlusIcon, TrashIcon } from "./icons.js"
 
 type LayerBrowserProps = {
   layers: readonly MapLayer[]
@@ -16,6 +16,7 @@ type LayerBrowserProps = {
   hidden: ReadonlySet<string>
   onToggleVisible: (id: string) => void
   onReorder: (from: number, to: number) => void
+  onImport: () => void
 }
 
 export function LayerBrowser(props: LayerBrowserProps) {
@@ -52,7 +53,12 @@ export function LayerBrowser(props: LayerBrowserProps) {
             )
           })}
         </ul>
-        <NewLayer onCreate={props.onCreateLayer} />
+        <div className="flex gap-1">
+          <IconButton tone="fill" aria-label={t("importData")} title={t("importData")} onClick={props.onImport}>
+            <ImportIcon />
+          </IconButton>
+          <NewLayer onCreate={props.onCreateLayer} />
+        </div>
       </div>
     )
   }

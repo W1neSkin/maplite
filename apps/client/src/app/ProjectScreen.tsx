@@ -9,6 +9,8 @@ import { ConflictCard } from "./cards.js"
 import { type Session } from "./connection.js"
 import { CoordBar } from "./coords.js"
 import { MapDock, PlacingBar, SyncActions } from "./dock.js"
+import { ImportBody } from "./import-sheet.js"
+import { loadBytes, type ImportOutcome } from "../import/load.js"
 import { t } from "../i18n/translate.js"
 import { LayerActions, LayerBrowser } from "./layers.js"
 import { moveItem } from "./order.js"
@@ -55,6 +57,9 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
   const [cursor, setCursor] = useState<[number, number] | null>(null)
   const [coordEdit, setCoordEdit] = useState(false)
   const [hidden, setHidden] = useState<Set<string>>(() => readHidden(session.projectId ?? ""))
+  const [outcome, setOutcome] = useState<ImportOutcome | null>(null)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const zipRef = useRef<Uint8Array | null>(null)
   const status = project.upgrade ? t("upgradeRequired") : project.failed ? t("serverUnavailable") : basemapFailed ? t("basemapUnavailable") : locationOff ? t("locationOff") : null
   const openLayer = openLayerId ? project.model.layers.find((layer) => layer.id === openLayerId) ?? null : null
   const placingLayer = placingLayerId ? project.model.layers.find((layer) => layer.id === placingLayerId) ?? null : null
@@ -156,6 +161,14 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
     else setCursor(coordinate)
   }
 
+  async function readImport(file: File) {
+    const bytes = new Uint8Array(await file.arrayBuffer())
+    zipRef.current = bytes
+    setOutcome(loadBytes(file.name, bytes))
+    setOpenLayerId(null)
+    setSheet(true)
+  }
+
   const selected = project.model.features.find((feature) => feature.id === selectedId) ?? null
   const selectedPoint = selected?.geometry.type === "Point" ? selected.geometry.coordinates : null
   const coordValue = !placingLayerId && selectedPoint ? selectedPoint : cursor
@@ -198,10 +211,10 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
       {sheet && !placingLayerId ? (
         <Sheet
           ref={sheetRef}
-          title={openLayer ? openLayer.name : t("layersTitle")}
-          onClose={() => { if (openLayerId) setOpenLayerId(null); else setSheet(false) }}
-          onRename={openLayer ? (name) => void project.renameLayer(openLayer.id, name) : undefined}
-          actions={openLayer ? (
+          title={outcome ? t("importData") : openLayer ? openLayer.name : t("layersTitle")}
+          onClose={() => { if (outcome) { setOutcome(null); return }; if (openLayerId) setOpenLayerId(null); else setSheet(false) }}
+          onRename={!outcome && openLayer ? (name) => void project.renameLayer(openLayer.id, name) : undefined}
+          actions={!outcome && openLayer ? (
             <LayerActions
               geometryType={openLayer.geometryType}
               onAdd={beginAdd}
@@ -210,6 +223,20 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
           ) : null}
           footer={<SyncActions lastSync={project.lastSync} onSync={syncNow} onBack={onBack} onDisconnect={onDisconnect} />}
         >
+          {outcome ? (
+            <ImportBody
+              outcome={outcome}
+              onChoose={(name) => { const bytes = zipRef.current; if (bytes) setOutcome(loadBytes("archive.zip", bytes, name)) }}
+              onConfirm={() => {
+                if (outcome.kind !== "ready") return
+                void project.importLayer(outcome).then((id) => {
+                  if (!id) return
+                  setOutcome(null)
+                  setOpenLayerId(id)
+                })
+              }}
+            />
+          ) : (
           <LayerBrowser
             layers={project.model.layers}
             features={project.model.features}
@@ -231,7 +258,9 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
               const ids = moveItem(project.model.layers.map((layer) => layer.id), from, to)
               project.reorderLayers(ids)
             }}
+            onImport={() => fileRef.current?.click()}
           />
+          )}
         </Sheet>
       ) : null}
       {project.conflict ? (
@@ -245,6 +274,17 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
           />
         </Sheet>
       ) : null}
+      <input
+        ref={fileRef}
+        type="file"
+        accept=".zip,.geojson,.json,application/zip,application/geo+json"
+        className="hidden"
+        onChange={(event) => {
+          const file = event.target.files?.[0]
+          event.target.value = ""
+          if (file) void readImport(file)
+        }}
+      />
       <CoordBar
         barRef={coordRef}
         value={coordValue}

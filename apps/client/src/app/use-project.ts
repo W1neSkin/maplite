@@ -1,4 +1,5 @@
-import { createId, type Feature, type Layer, type SnapshotEntity, type SyncOperation } from "@cartography/project-schema"
+import { createId, type Feature, type JsonValue, type Layer, type SnapshotEntity, type SyncOperation } from "@cartography/project-schema"
+import type { ImportReady } from "../import/load.js"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { clientId, editOrigin, type Session } from "./connection.js"
 import { buildMapModel, type MapModel } from "./model.js"
@@ -76,12 +77,12 @@ export function useProject(session: Session) {
     }
   }, [pull, session])
 
-  async function sendMany(operations: SyncOperation[]): Promise<boolean> {
+  async function sendMany(operations: SyncOperation[], atomic = false): Promise<boolean> {
     if (!session.projectId || operations.length === 0) return false
     const stamped = operations.map((operation) => ({ ...operation, origin: editOrigin() }))
     setFailed(false)
     try {
-      const response = await pushOps(session, stamped)
+      const response = await pushOps(session, stamped, atomic)
       const conflicted = response.results.find((result) => result.status === "conflict")
       if (conflicted && conflicted.status === "conflict") {
         const operation = stamped.find((item) => item.opId === conflicted.opId) ?? stamped[0]
@@ -178,5 +179,30 @@ export function useProject(session: Session) {
     void sendMany(operations)
   }
 
-  return { model, loading, failed, setFailed, upgrade, conflict, setConflict, lastSync, pull, send, renameLayer, deleteLayer, createPointLayer, createPoint, renameFeature, deleteFeature, movePoint, reorderLayers }
+  async function importLayer(ready: ImportReady): Promise<string | null> {
+    if (!session.projectId) return Promise.resolve(null)
+    const projectId = session.projectId
+    const layerId = createId()
+    const layer: Layer = {
+      id: layerId,
+      projectId,
+      groupId: null,
+      name: ready.name,
+      geometryType: ready.geometryType,
+      style: { color: "#2563eb", fillOpacity: ready.geometryType === "Polygon" ? 0.28 : 0, strokeWidth: 2, labelAttribute: null },
+      source: { format: ready.crsWkt ? "shapefile" : "geojson", originalName: ready.name, crsWkt: ready.crsWkt ?? undefined, crsProfileId: ready.profileId ?? undefined, operationId: ready.operationId ?? undefined },
+      status: "ready",
+      order: model.layers.length,
+    }
+    const operations: SyncOperation[] = [{ opId: createId(), clientId: clientId(), projectId, entityType: "layer", entityId: layerId, kind: "create", baseVersion: null, payload: layer }]
+    for (const feature of ready.features) {
+      const id = createId()
+      const payload: Feature = { id, projectId, layerId, geometry: feature.geometry, properties: feature.properties as Record<string, JsonValue> }
+      operations.push({ opId: createId(), clientId: clientId(), projectId, entityType: "feature", entityId: id, kind: "create", baseVersion: null, payload })
+    }
+    const ok = await sendMany(operations, true)
+    return ok ? layerId : null
+  }
+
+  return { model, loading, failed, setFailed, upgrade, conflict, setConflict, lastSync, pull, send, renameLayer, deleteLayer, createPointLayer, createPoint, renameFeature, deleteFeature, movePoint, reorderLayers, importLayer }
 }

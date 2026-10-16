@@ -13,10 +13,12 @@
   "dependencies": {
     "@cartography/extension-api": "workspace:*",
     "@cartography/extension-example": "workspace:*",
+    "@cartography/geo-core": "workspace:*",
     "@cartography/project-schema": "workspace:*",
     "@radix-ui/react-slot": "^1.2.3",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
+    "fflate": "^0.8.3",
     "ol": "^10.11.0",
     "qrcode": "^1.5.4",
     "react": "^19.2.0",
