@@ -6,7 +6,7 @@ import { clientId, saveSession, type Session } from "./connection.js"
 import { BasemapPack } from "./basemap-pack.js"
 import { EyeIcon, EyeOffIcon, IconButton, PlusIcon, TrashIcon } from "./icons.js"
 import type { LivePerson } from "./use-live.js"
-import { rememberDeviceLabel } from "./use-live.js"
+import { deviceLabel, rememberDeviceLabel } from "./use-live.js"
 
 export function DevicesPanel(props: {
   session: Session
@@ -35,6 +35,7 @@ export function DevicesPanel(props: {
   return (
     <div className="flex flex-col gap-2">
       <BasemapPack />
+      {props.surface === "device" ? <DeviceName /> : null}
       {props.surface === "device" ? (
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={props.sharing} onChange={(event) => props.onSharing(event.target.checked)} />
@@ -115,5 +116,33 @@ export function DevicesPanel(props: {
         ))}
       </ul>
     </div>
+  )
+}
+
+function DeviceName() {
+  const [name, setName] = useState(deviceLabel)
+  function save(value: string) {
+    const next = value.trim() || "Phone"
+    setName(next)
+    if (next !== deviceLabel()) rememberDeviceLabel(next)
+  }
+  return (
+    <form
+      className="flex items-center gap-2"
+      onSubmit={(event) => {
+        event.preventDefault()
+        save(name)
+      }}
+    >
+      <label className="shrink-0 text-sm" htmlFor="device-name">{t("deviceName")}</label>
+      <input
+        id="device-name"
+        aria-label={t("deviceName")}
+        className="h-8 min-w-0 flex-1 rounded-lg border border-[var(--border)] px-2 text-sm"
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        onBlur={() => save(name)}
+      />
+    </form>
   )
 }

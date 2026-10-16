@@ -41,7 +41,9 @@ export function deviceLabel(): string {
 }
 
 export function rememberDeviceLabel(name: string): void {
-  localStorage.setItem(NAME_KEY, name)
+  const next = name.trim() || "Phone"
+  localStorage.setItem(NAME_KEY, next)
+  void ShareLocation.rename({ name: next }).catch(() => {})
 }
 
 /** The enrolled phone publishes as its device id. A demo phone uses the local client id. */

@@ -36,6 +36,16 @@ public class ShareLocationPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void rename(PluginCall call) {
+        // The running service reads the name on each send, so the next fix uses it.
+        getContext().getSharedPreferences("share-location", android.content.Context.MODE_PRIVATE)
+            .edit()
+            .putString("name", call.getString("name", "Phone"))
+            .apply();
+        call.resolve();
+    }
+
+    @PluginMethod
     public void stop(PluginCall call) {
         getContext().stopService(new Intent(getContext(), ShareService.class));
         call.resolve();
