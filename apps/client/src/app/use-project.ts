@@ -204,5 +204,15 @@ export function useProject(session: Session) {
     return ok ? layerId : null
   }
 
-  return { model, loading, failed, setFailed, upgrade, conflict, setConflict, lastSync, pull, send, renameLayer, deleteLayer, createPointLayer, createPoint, renameFeature, deleteFeature, movePoint, reorderLayers, importLayer }
+  function recordsIn(layerId: string): Feature[] {
+    const records: Feature[] = []
+    for (const item of docs) {
+      if (item.deleted || item.entityType !== "feature") continue
+      const feature = item.payload as Feature
+      if (feature.layerId === layerId) records.push(feature)
+    }
+    return records
+  }
+
+  return { model, loading, failed, setFailed, upgrade, conflict, setConflict, lastSync, pull, send, renameLayer, deleteLayer, createPointLayer, createPoint, renameFeature, deleteFeature, movePoint, reorderLayers, importLayer, recordsIn }
 }

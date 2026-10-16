@@ -41,6 +41,7 @@ export const messages = {
   hideLayer: "Hide layer",
   moveLayer: "Move layer",
   importData: "Import",
+  exportLayer: "Export layer",
   importConfirm: "Import",
   importCount: "{count} features",
   importWgs84: "Longitude and latitude",

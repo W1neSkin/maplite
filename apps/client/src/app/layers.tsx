@@ -1,7 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { t } from "../i18n/translate.js"
 import type { MapFeature, MapLayer } from "./model.js"
-import { CheckIcon, CloseIcon, EyeIcon, EyeOffIcon, GeometryGlyph, GripIcon, IconButton, ImportIcon, PencilIcon, PinIcon, PlusIcon, TrashIcon } from "./icons.js"
+import { CheckIcon, CloseIcon, ExportIcon, EyeIcon, EyeOffIcon, GeometryGlyph, GripIcon, IconButton, ImportIcon, PencilIcon, PinIcon, PlusIcon, TrashIcon } from "./icons.js"
 
 type LayerBrowserProps = {
   layers: readonly MapLayer[]
@@ -194,7 +194,7 @@ function NewLayer(props: { onCreate: (name: string) => void }) {
   )
 }
 
-export function LayerActions(props: { geometryType: MapLayer["geometryType"]; onAdd: () => void; onDelete: () => void }) {
+export function LayerActions(props: { geometryType: MapLayer["geometryType"]; onAdd: () => void; onExport: () => void; onDelete: () => void }) {
   return (
     <>
       {props.geometryType === "Point" ? (
@@ -202,6 +202,9 @@ export function LayerActions(props: { geometryType: MapLayer["geometryType"]; on
           <PinIcon />
         </IconButton>
       ) : null}
+      <IconButton tone="fill" aria-label={t("exportLayer")} title={t("exportLayer")} onClick={props.onExport}>
+        <ExportIcon />
+      </IconButton>
       <IconButton tone="fill" aria-label={t("deleteLayer")} title={t("deleteLayer")} onClick={props.onDelete}>
         <TrashIcon />
       </IconButton>

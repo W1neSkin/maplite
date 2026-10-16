@@ -13,6 +13,8 @@ import { CoordBar } from "./coords.js"
 import { MapDock, PlacingBar, SyncActions } from "./dock.js"
 import { ImportBody } from "./import-sheet.js"
 import { loadBytes, type ImportOutcome } from "../import/load.js"
+import { saveZip } from "../import/save-zip.js"
+import { layerZip } from "../import/write-shp.js"
 import { t } from "../i18n/translate.js"
 import { LayerActions, LayerBrowser } from "./layers.js"
 import { moveItem } from "./order.js"
@@ -236,6 +238,10 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
             <LayerActions
               geometryType={openLayer.geometryType}
               onAdd={beginAdd}
+              onExport={() => {
+                const file = layerZip(openLayer.name, openLayer.geometryType, project.recordsIn(openLayer.id))
+                void saveZip(file.filename, file.bytes)
+              }}
               onDelete={() => void project.deleteLayer(openLayer.id).then((ok) => { if (!ok) return; if (openLayerId === openLayer.id) setOpenLayerId(null); setSelectedId(null) })}
             />
           ) : null}
