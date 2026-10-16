@@ -1,4 +1,5 @@
 import type { Feature, Layer, SnapshotResponse } from "@cartography/project-schema"
+import { byWalk } from "./walk.js"
 
 export type MapLayer = {
   id: string
@@ -91,6 +92,8 @@ export function buildMapModel(snapshot: SnapshotResponse): MapModel {
       properties: plainProperties(feature.properties),
     })
   }
+  // List order is the order a line or polygon will be built in.
+  features.sort((left, right) => (left.layerId === right.layerId ? byWalk(left, right) : 0))
   return {
     layers: ordered.map((layer) => ({
         id: layer.id,

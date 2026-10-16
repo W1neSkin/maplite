@@ -7,6 +7,7 @@ import { applyLocal, forgetOps, readPhoneCache, rememberOps, writePhoneCache } f
 import { pushOps, readAll, readChanges, watchChanges } from "../sync/api.js"
 import { applyRemote } from "../sync/edits.js"
 import { deliveryOperations } from "./delivery.js"
+import { movedIds } from "./walk.js"
 import { historyStep, stampForNow, type HistoryStep } from "./undo.js"
 
 export type Conflict = { operation: SyncOperation; serverVersion: number; serverPayload: unknown; serverDeleted: boolean }
@@ -302,6 +303,96 @@ export function useProject(session: Session) {
     updateGeometry(id, { type: "Point", coordinates: [Number(coordinate[0].toFixed(6)), Number(coordinate[1].toFixed(6))] })
   }
 
+  /** List order is the walk. The first move numbers every point; later moves change only the ones that shifted. */
+  function moveFeature(id: string, direction: -1 | 1) {
+    const feature = featureOf(docs, id)
+    const projectId = session.projectId
+    if (!feature || !projectId) return
+    const ids = model.features.filter((item) => item.layerId === feature.layerId).map((item) => item.id)
+    const next = movedIds(ids, id, direction)
+    if (!next) return
+    const operations: SyncOperation[] = []
+    next.forEach((featureId, walk) => {
+      const current = featureOf(docs, featureId)
+      if (!current || current.properties.walk === walk) return
+      operations.push({
+        opId: createId(),
+        clientId: clientId(),
+        projectId,
+        entityType: "feature",
+        entityId: featureId,
+        kind: "update",
+        baseVersion: versionOf(featureId),
+        payload: { ...current, properties: { ...current.properties, walk } },
+      })
+    })
+    void sendMany(operations)
+  }
+
+  /**
+   * One line or polygon for a point layer. Building again replaces that shape.
+   * The ring is stored closed. The caller passes the walk order, not a closed ring.
+   */
+  async function saveBuiltShape(input: {
+    sourceLayerId: string
+    name: string
+    groupId: string | null
+    kind: "LineString" | "Polygon"
+    coordinates: [number, number][]
+    pointIds: string[]
+  }): Promise<string | null> {
+    const projectId = session.projectId
+    if (!projectId || input.coordinates.length === 0) return null
+    const geometry: Feature["geometry"] = input.kind === "LineString"
+      ? { type: "LineString", coordinates: input.coordinates }
+      : { type: "Polygon", coordinates: [[...input.coordinates, input.coordinates[0]!]] }
+    const derived = { layerId: input.sourceLayerId, pointIds: input.pointIds }
+    const existing = docs.find((item) => {
+      if (item.deleted || item.entityType !== "layer") return false
+      const layer = item.payload as Layer
+      return layer.derivedFrom?.layerId === input.sourceLayerId && layer.geometryType === input.kind
+    })
+    if (existing) {
+      const layer = existing.payload as Layer
+      const featureRow = docs.find((item) => !item.deleted && item.entityType === "feature" && (item.payload as Feature).layerId === layer.id)
+      const operations: SyncOperation[] = []
+      if (JSON.stringify(layer.derivedFrom) !== JSON.stringify(derived)) {
+        operations.push({ opId: createId(), clientId: clientId(), projectId, entityType: "layer", entityId: layer.id, kind: "update", baseVersion: existing.version, payload: { ...layer, derivedFrom: derived } })
+      }
+      if (featureRow) {
+        const feature = featureRow.payload as Feature
+        if (JSON.stringify(feature.geometry) !== JSON.stringify(geometry)) {
+          operations.push({ opId: createId(), clientId: clientId(), projectId, entityType: "feature", entityId: feature.id, kind: "update", baseVersion: featureRow.version, payload: { ...feature, geometry } })
+        }
+      } else {
+        const featureId = createId()
+        operations.push({ opId: createId(), clientId: clientId(), projectId, entityType: "feature", entityId: featureId, kind: "create", baseVersion: null, payload: { id: featureId, projectId, layerId: layer.id, geometry, properties: { name: input.name } } })
+      }
+      if (operations.length === 0) return layer.id
+      return (await sendMany(operations, true)) ? layer.id : null
+    }
+    const layerId = createId()
+    const featureId = createId()
+    const layer: Layer = {
+      id: layerId,
+      projectId,
+      groupId: input.groupId,
+      name: input.name,
+      geometryType: input.kind,
+      style: { color: "#2563eb", fillOpacity: input.kind === "Polygon" ? 0.28 : 0, strokeWidth: 2, labelAttribute: null },
+      source: { format: "derived" },
+      status: "ready",
+      derivedFrom: derived,
+      order: model.layers.length,
+    }
+    const feature: Feature = { id: featureId, projectId, layerId, geometry, properties: { name: input.name } }
+    const ok = await sendMany([
+      { opId: createId(), clientId: clientId(), projectId, entityType: "layer", entityId: layerId, kind: "create", baseVersion: null, payload: layer },
+      { opId: createId(), clientId: clientId(), projectId, entityType: "feature", entityId: featureId, kind: "create", baseVersion: null, payload: feature },
+    ], true)
+    return ok ? layerId : null
+  }
+
   function reorderLayers(ids: readonly string[]) {
     if (!session.projectId) return
     const operations: SyncOperation[] = []
@@ -427,5 +518,5 @@ export function useProject(session: Session) {
   }
 
   const controlPoints = docs.filter((item) => item.entityType === "controlPoint" && !item.deleted).map((item) => item.payload as ControlPoint)
-  return { model, loading, failed, setFailed, pending, flush: () => flushPending().catch(() => setFailed(true)), upgrade, conflict, setConflict, lastSync, pull, send, renameLayer, restyleLayer, deleteLayer, createPointLayer, createGroup, setLayerGroup, createPoint, createFeature, renameFeature, deleteFeature, movePoint, updateGeometry, reorderLayers, importLayer, recordsIn, sendLayer, controlPoints, addControlPoint, deleteControlPoint, seatFeatures, canUndo: history.undo > 0, canRedo: history.redo > 0, undo: () => play("undo"), redo: () => play("redo") }
+  return { model, loading, failed, setFailed, pending, flush: () => flushPending().catch(() => setFailed(true)), upgrade, conflict, setConflict, lastSync, pull, send, renameLayer, restyleLayer, deleteLayer, createPointLayer, createGroup, setLayerGroup, createPoint, createFeature, renameFeature, deleteFeature, movePoint, moveFeature, updateGeometry, reorderLayers, saveBuiltShape, importLayer, recordsIn, sendLayer, controlPoints, addControlPoint, deleteControlPoint, seatFeatures, canUndo: history.undo > 0, canRedo: history.redo > 0, undo: () => play("undo"), redo: () => play("redo") }
 }

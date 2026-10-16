@@ -15,6 +15,7 @@
 - Pending phone edits are kept in the WebView store, not in a native SQLite file. They survive a force-stop. A browser edit is not queued.
 - Live sharing on Android keeps running with the screen off through a foreground notification. It stops after force-stop. A recorded track is started on the phone itself and saved as a line layer. iOS background sharing is not built. Remote start and stop are not built.
 - The ring around the location dot is the accuracy the device reported. It is drawn on the ellipsoid, then projected with the map. It is not a guaranteed error.
+- Building a line or polygon again from the same points replaces that shape. It does not add a second copy.
 - The public OpenStreetMap tile servers are used by the browser demo. The caching tile proxy is not built yet. Offline pictures are a zip of z/x/y.png plus tiles the map has already shown, capped at 4000.
 - Request bodies are checked in code. A JSON Schema validator is not wired through every route yet.
 - The Docker process runs as root so the data volume is writable.

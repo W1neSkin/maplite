@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { t } from "../i18n/translate.js"
 import { measureLabel } from "./measure-label.js"
 import type { MapFeature, MapLayer } from "./model.js"
-import { CheckIcon, CloseIcon, ControlIcon, ExportIcon, EyeIcon, EyeOffIcon, GeometryGlyph, GripIcon, GroupIcon, IconButton, ImportIcon, LayerIcon, PencilIcon, PinIcon, SendIcon, TrashIcon } from "./icons.js"
+import { CheckIcon, CloseIcon, ControlIcon, ExportIcon, EyeIcon, EyeOffIcon, GeometryGlyph, GripIcon, GroupIcon, IconButton, ImportIcon, LayerIcon, PencilIcon, PinIcon, SendIcon, StepIcon, TrashIcon } from "./icons.js"
 import type { MapGroup } from "./model.js"
 import { FieldTools } from "./field-tools.js"
 import { LIVE_DEVICE_LAYER, LiveLayerBody, LiveLayerRow } from "./live-layer.js"
@@ -28,6 +28,8 @@ type LayerBrowserProps = {
   onControls: () => void
   locked: boolean
   fieldBusy: boolean
+  fieldNote: string | null
+  onMoveFeature: (id: string, direction: -1 | 1) => void
   onMark: () => void
   onAverage: () => void
   onBuildLine: () => void
@@ -111,18 +113,22 @@ export function LayerBrowser(props: LayerBrowserProps) {
       </div>
     )
   }
-  const features = props.features.filter((feature) => feature.layerId === layer.id).filter((feature) => {
-    const needle = query.trim().toLowerCase()
+  const ranked = props.features.filter((feature) => feature.layerId === layer.id)
+  const needle = query.trim().toLowerCase()
+  const features = ranked.filter((feature) => {
     if (!needle) return true
-    const hay = [feature.name, ...Object.entries(feature.properties).flat()].join(" ").toLowerCase()
+    const hay = [feature.name, ...Object.entries(feature.properties).filter(([key]) => key !== "walk").flat()].join(" ").toLowerCase()
     return hay.includes(needle)
   })
+  const canMove = layer.geometryType === "Point" && !props.locked
   return (
     <div className="flex flex-col gap-1">
       <input aria-label={t("searchFeatures")} className="h-8 rounded-lg border border-[var(--border)] px-2 text-sm" value={query} onChange={(event) => setQuery(event.target.value)} />
-      {layer.geometryType === "Point" && !props.locked ? <FieldTools busy={props.fieldBusy} onMark={props.onMark} onAverage={props.onAverage} onLine={props.onBuildLine} onPolygon={props.onBuildPolygon} /> : null}
+      {canMove ? <FieldTools busy={props.fieldBusy} note={props.fieldNote} onMark={props.onMark} onAverage={props.onAverage} onLine={props.onBuildLine} onPolygon={props.onBuildPolygon} /> : null}
     <ul className="flex flex-col">
-      {features.map((feature) => (
+      {features.map((feature) => {
+        const index = ranked.findIndex((item) => item.id === feature.id)
+        return (
         <FeatureRow
           key={feature.id}
           feature={feature}
@@ -131,8 +137,12 @@ export function LayerBrowser(props: LayerBrowserProps) {
           locked={props.locked}
           onRename={(name) => props.onRenameFeature(feature.id, name)}
           onDelete={() => props.onDeleteFeature(feature.id)}
+          move={canMove ? (direction) => props.onMoveFeature(feature.id, direction) : null}
+          atStart={index <= 0}
+          atEnd={index < 0 || index === ranked.length - 1}
         />
-      ))}
+        )
+      })}
     </ul>
     </div>
   )
@@ -153,7 +163,7 @@ function revealInSheet(row: HTMLElement) {
 
 /** Name is already the row title. Accuracy fields use words, not the stored key. */
 function shownProperty(key: string, value: unknown): { label: string; text: string } | null {
-  if (key === "name") return null
+  if (key === "name" || key === "walk") return null
   if ((key === "accuracyM" || key === "scatterM") && typeof value === "number") {
     return { label: key === "accuracyM" ? t("reportedAccuracy") : t("scatter"), text: t("accuracyMeters", { meters: Math.round(value) }) }
   }
@@ -161,7 +171,7 @@ function shownProperty(key: string, value: unknown): { label: string; text: stri
   return { label: key, text: String(value) }
 }
 
-function FeatureRow(props: { feature: MapFeature; selected: boolean; locked: boolean; onSelect: () => void; onRename: (name: string) => void; onDelete: () => void }) {
+function FeatureRow(props: { feature: MapFeature; selected: boolean; locked: boolean; onSelect: () => void; onRename: (name: string) => void; onDelete: () => void; move: ((direction: -1 | 1) => void) | null; atStart: boolean; atEnd: boolean }) {
   const rowRef = useRef<HTMLLIElement>(null)
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(props.feature.name)
@@ -220,6 +230,12 @@ function FeatureRow(props: { feature: MapFeature; selected: boolean; locked: boo
         </button>
         {props.selected && !props.locked ? (
           <>
+            {props.move ? (
+              <>
+                <IconButton aria-label={t("moveUp")} title={t("moveUp")} disabled={props.atStart} onClick={() => props.move?.(-1)}><StepIcon direction="up" /></IconButton>
+                <IconButton aria-label={t("moveDown")} title={t("moveDown")} disabled={props.atEnd} onClick={() => props.move?.(1)}><StepIcon direction="down" /></IconButton>
+              </>
+            ) : null}
             <IconButton aria-label={t("rename")} title={t("rename")} onClick={() => setEditing(true)}>
               <PencilIcon />
             </IconButton>

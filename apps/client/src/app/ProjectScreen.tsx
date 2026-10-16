@@ -93,6 +93,7 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
   const [controlPick, setControlPick] = useState(false)
   const [controlDraft, setControlDraft] = useState<[number, number] | null>(null)
   const [fieldBusy, setFieldBusy] = useState(false)
+  const [fieldNote, setFieldNote] = useState<string | null>(null)
   const placeNameTouched = useRef(false)
   const [reveal, setReveal] = useState<{ id: string; token: number } | null>(null)
   const [cursor, setCursor] = useState<[number, number] | null>(null)
@@ -118,6 +119,7 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
   }, [reveal])
 
   useEffect(() => setCoordEdit(false), [selectedId, placingLayerId])
+  useEffect(() => setFieldNote(null), [openLayerId])
 
   useEffect(() => {
     function onKey(event: KeyboardEvent) {
@@ -311,14 +313,21 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
   async function buildShape(kind: "LineString" | "Polygon") {
     if (!openLayer) return
     const points = project.model.features.filter((feature) => feature.layerId === openLayer.id && feature.geometry.type === "Point")
-    if (kind === "LineString" && points.length < 2) return
-    if (kind === "Polygon" && points.length < 3) return
-    const coordinates = points.flatMap((feature) => feature.geometry.type === "Point" ? [feature.geometry.coordinates] : [])
-    const id = await project.createPointLayer(`${openLayer.name} ${kind === "LineString" ? "line" : "area"}`, kind, openLayer.groupId)
-    if (!id) return
-    const geometry = kind === "LineString" ? { type: "LineString" as const, coordinates } : { type: "Polygon" as const, coordinates: [[...coordinates, coordinates[0]!]] }
-    await project.createFeature(id, geometry, openLayer.name)
-    setOpenLayerId(id)
+    const need = kind === "LineString" ? 2 : 3
+    if (points.length < need) {
+      setFieldNote(t("needMore", { count: need - points.length }))
+      return
+    }
+    setFieldNote(null)
+    const id = await project.saveBuiltShape({
+      sourceLayerId: openLayer.id,
+      name: `${openLayer.name} ${kind === "LineString" ? "line" : "area"}`,
+      groupId: openLayer.groupId,
+      kind,
+      coordinates: points.flatMap((feature) => feature.geometry.type === "Point" ? [feature.geometry.coordinates] : []),
+      pointIds: points.map((feature) => feature.id),
+    })
+    if (id) setOpenLayerId(id)
   }
 
   async function readImport(file: File) {
@@ -568,6 +577,8 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
             onControls={() => setControlsOpen(true)}
             locked={openLayer?.delivery != null}
             fieldBusy={fieldBusy}
+            fieldNote={fieldNote}
+            onMoveFeature={project.moveFeature}
             onMark={() => void markHere()}
             onAverage={() => void averageHere()}
             onBuildLine={() => void buildShape("LineString")}

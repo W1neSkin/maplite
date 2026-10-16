@@ -64,6 +64,14 @@ export function CloseIcon() {
   )
 }
 
+export function StepIcon(props: { direction: "up" | "down" }) {
+  return (
+    <Glyph>
+      <path d={props.direction === "up" ? "m6 14 6-6 6 6" : "m6 10 6 6 6-6"} />
+    </Glyph>
+  )
+}
+
 export function PlusIcon() {
   return (
     <Glyph>
