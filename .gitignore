@@ -18,3 +18,4 @@ apps/mobile/.capacitor/
 .gradle/
 DerivedData/
 THIRD_PARTY_NOTICES.generated.md
+PLAN.md
