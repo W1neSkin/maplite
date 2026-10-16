@@ -12,7 +12,18 @@ const FRESH_MS = 30_000
 const DROP_MS = 120_000
 const HEARTBEAT_MS = 20_000
 
-export type LiveMarker = { id: string; name: string; coordinate: [number, number]; faded: boolean }
+export type LiveMarker = { id: string; name: string; coordinate: [number, number]; faded: boolean; courseDeg: number | null; trail: [number, number][] }
+
+function trailOf(value: unknown): [number, number][] {
+  if (!Array.isArray(value)) return []
+  const points: [number, number][] = []
+  for (const item of value) {
+    if (!Array.isArray(item) || item.length < 2) continue
+    if (typeof item[0] !== "number" || typeof item[1] !== "number") continue
+    points.push([item[0], item[1]])
+  }
+  return points
+}
 export type LivePerson = { id: string; name: string; shown: boolean }
 
 function readSet(key: string): Set<string> {
@@ -54,7 +65,15 @@ function deviceMessages(messages: readonly LiveMessage[], now: number, hidden: R
     const name = typeof message.body.name === "string" && message.body.name.trim() ? message.body.name : message.id
     const shown = !hidden.has(message.id)
     people.push({ id: message.id, name, shown })
-    if (shown) markers.push({ id: message.id, name, coordinate: [longitude, latitude], faded: age > FRESH_MS })
+    const course = message.body.courseDeg
+    if (shown) markers.push({
+      id: message.id,
+      name,
+      coordinate: [longitude, latitude],
+      faded: age > FRESH_MS,
+      courseDeg: typeof course === "number" && Number.isFinite(course) ? course : null,
+      trail: trailOf(message.body.trail),
+    })
   }
   return { markers, people }
 }

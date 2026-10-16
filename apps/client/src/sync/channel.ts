@@ -4,7 +4,7 @@ export type LiveMessage = {
   type: string
   id: string
   receivedAt: string
-  body: { name?: unknown; longitude?: unknown; latitude?: unknown; sharing?: unknown }
+  body: { name?: unknown; longitude?: unknown; latitude?: unknown; sharing?: unknown; courseDeg?: unknown; trail?: unknown }
 }
 
 export type DeviceRow = { id: string; displayName: string }

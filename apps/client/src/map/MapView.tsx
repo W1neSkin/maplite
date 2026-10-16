@@ -5,12 +5,14 @@ import Attribution from "ol/control/Attribution"
 import Zoom from "ol/control/Zoom"
 import GeoJSON from "ol/format/GeoJSON"
 import Feature from "ol/Feature"
+import LineString from "ol/geom/LineString"
 import Point from "ol/geom/Point"
 import Overlay from "ol/Overlay"
 import TileLayer from "ol/layer/Tile"
 import VectorLayer from "ol/layer/Vector"
 import Circle from "ol/style/Circle"
 import Fill from "ol/style/Fill"
+import RegularShape from "ol/style/RegularShape"
 import Stroke from "ol/style/Stroke"
 import Style from "ol/style/Style"
 import Text from "ol/style/Text"
@@ -28,7 +30,7 @@ import { attachVertexEdit } from "./vertex-edit.js"
 
 export type MapCallout = { coordinate: [number, number]; title: string; layer: string }
 
-export type LiveMarker = { id: string; name: string; coordinate: [number, number]; faded: boolean }
+export type LiveMarker = { id: string; name: string; coordinate: [number, number]; faded: boolean; courseDeg?: number | null; trail?: readonly [number, number][] }
 
 export type MapHandle = {
   fit(): void
@@ -169,9 +171,18 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
     const liveLayer = new VectorLayer({
       source: liveSource,
       style: (feature) => {
+        if (feature.getGeometry()?.getType() === "LineString") {
+          return new Style({ stroke: new Stroke({ color: "rgba(180,83,9,0.75)", width: 2, lineDash: [6, 6] }) })
+        }
         const faded = feature.get("faded") === true
+        const course = feature.get("courseDeg")
+        const ink = faded ? "rgba(180,83,9,0.35)" : "#b45309"
+        // Course is degrees clockwise from true north. The triangle points that way.
+        const image = typeof course === "number"
+          ? new RegularShape({ points: 3, radius: 9, rotation: (course * Math.PI) / 180, rotateWithView: true, fill: new Fill({ color: ink }), stroke: new Stroke({ color: "#ffffff", width: 2 }) })
+          : new Circle({ radius: 7, fill: new Fill({ color: ink }), stroke: new Stroke({ color: "#ffffff", width: 2 }) })
         return new Style({
-          image: new Circle({ radius: 7, fill: new Fill({ color: faded ? "rgba(180,83,9,0.35)" : "#b45309" }), stroke: new Stroke({ color: "#ffffff", width: 2 }) }),
+          image,
           text: new Text({ text: String(feature.get("name") ?? ""), offsetY: -16, font: "12px sans-serif", fill: new Fill({ color: faded ? "rgba(17,24,39,0.45)" : "#111827" }), stroke: new Stroke({ color: "#ffffff", width: 3 }) }),
         })
       },
@@ -334,9 +345,15 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
     const projection = map.getView().getProjection().getCode()
     source.clear()
     for (const marker of live) {
+      const trail = marker.trail ?? []
+      if (trail.length >= 2) {
+        const line = new Feature(new LineString(trail.map((coordinate) => transform(coordinate, "EPSG:4326", projection))))
+        source.addFeature(line)
+      }
       const feature = new Feature(new Point(transform(marker.coordinate, "EPSG:4326", projection)))
       feature.set("name", marker.name)
       feature.set("faded", marker.faded)
+      if (typeof marker.courseDeg === "number") feature.set("courseDeg", marker.courseDeg)
       source.addFeature(feature)
     }
   }, [live, projectionId])

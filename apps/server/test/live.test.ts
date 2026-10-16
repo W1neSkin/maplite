@@ -33,12 +33,15 @@ describe("live channel", () => {
     expect(publishLive(db, projectId, message(), null)).toBe("ok")
     expect(publishLive(db, projectId, message(), null)).toBe("ok")
     expect(listLive(db, projectId)).toHaveLength(1)
-    const first = listLive(db, projectId)[0]?.receivedAt
     expect(publishLive(db, projectId, message({ fixId: "fix-2", sampledAt: "2026-10-16T11:00:00.000Z", body: { name: "Phone", sharing: true, longitude: 1, latitude: 2 } }), null)).toBe("stale")
     expect(listLive(db, projectId)[0]?.body.longitude).toBe(27.5)
-    expect(publishLive(db, projectId, message({ fixId: "fix-3", sampledAt: "2026-10-16T12:00:20.000Z", body: { name: "Phone", sharing: true, longitude: 27.6, latitude: 53.9 } }), null)).toBe("ok")
-    expect(listLive(db, projectId)[0]?.body.longitude).toBe(27.6)
-    expect(listLive(db, projectId)[0]?.receivedAt).not.toBe(first)
+    expect(publishLive(db, projectId, message({ fixId: "fix-3", sampledAt: "2026-10-16T12:00:20.000Z", body: { name: "Phone", sharing: true, longitude: 27.6, latitude: 53.9, courseDeg: 90 } }), null)).toBe("ok")
+    const moved = listLive(db, projectId)[0]
+    expect(moved?.body.longitude).toBe(27.6)
+    expect(moved?.body.courseDeg).toBe(90)
+    expect(moved?.body.trail).toEqual([[27.5, 53.9], [27.6, 53.9]])
+    expect(publishLive(db, projectId, message({ fixId: "fix-4", sampledAt: "2026-10-16T12:00:40.000Z", body: { name: "Phone", sharing: true, longitude: 27.6, latitude: 53.9, courseDeg: 90 } }), null)).toBe("ok")
+    expect(listLive(db, projectId)[0]?.body.trail).toEqual([[27.5, 53.9], [27.6, 53.9]])
   })
 
   it("removes the point when sharing stops and refuses another device id", () => {

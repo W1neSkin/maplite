@@ -13,6 +13,39 @@ export type LiveEnvelope = {
 export type StoredLive = LiveEnvelope & { receivedAt: string }
 
 const TYPE_RE = /^[a-z0-9-]{1,32}$/
+const TRAIL_LIMIT = 20
+const TRAIL_GAP_M = 8
+
+function pair(value: unknown): [number, number] | null {
+  if (!Array.isArray(value) || value.length < 2) return null
+  const longitude = value[0]
+  const latitude = value[1]
+  if (typeof longitude !== "number" || typeof latitude !== "number") return null
+  return [longitude, latitude]
+}
+
+function meters(a: [number, number], b: [number, number]): number {
+  const lat = ((a[1] + b[1]) / 2) * (Math.PI / 180)
+  const east = (b[0] - a[0]) * Math.cos(lat) * 111_320
+  const north = (b[1] - a[1]) * 110_540
+  return Math.hypot(east, north)
+}
+
+/** A standing heartbeat must not grow the trail. This is not a saved track. */
+function nextTrail(existing: StoredLive | null, longitude: number, latitude: number): [number, number][] {
+  const previous: [number, number][] = []
+  const raw = existing?.body.trail
+  if (Array.isArray(raw)) {
+    for (const item of raw) {
+      const point = pair(item)
+      if (point) previous.push(point)
+    }
+  }
+  const here: [number, number] = [longitude, latitude]
+  const last = previous[previous.length - 1]
+  if (last && meters(last, here) < TRAIL_GAP_M) return previous.slice(-TRAIL_LIMIT)
+  return [...previous, here].slice(-TRAIL_LIMIT)
+}
 
 function rowId(projectId: string, type: string, id: string): string {
   return `${projectId}:${type}:${id}`
@@ -50,8 +83,13 @@ export function publishLive(db: AppDatabase, projectId: string, input: LiveEnvel
   const existing = readOne(db, projectId, input.type, input.id)
   if (existing?.fixId === input.fixId) return "ok"
   if (existing && existing.sampledAt > input.sampledAt) return "stale"
+  const body = { ...input.body }
+  if (input.type === "device" && typeof body.longitude === "number" && typeof body.latitude === "number") {
+    body.trail = nextTrail(existing, body.longitude, body.latitude)
+  }
   const stored: StoredLive = {
     ...input,
+    body,
     deviceId: input.deviceId ?? input.id,
     receivedAt: new Date().toISOString(),
   }
