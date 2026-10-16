@@ -26,6 +26,8 @@ import { layerZip } from "../import/write-shp.js"
 import { formatLength } from "../i18n/format.js"
 import { t } from "../i18n/translate.js"
 import { LIVE_COLOR, LIVE_DEVICE_LAYER } from "./live-layer.js"
+import { ShareLocation } from "../platform/share-location.js"
+import { clearLocalTrack, readLocalTrack } from "./track-store.js"
 import { labelFields, LayerStyle } from "./layer-style.js"
 import { LayerActions, LayerBrowser } from "./layers.js"
 import { groupedIds } from "./order.js"
@@ -448,6 +450,30 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
               surface={surface}
               sharing={live.sharing}
               onSharing={live.setSharing}
+              recording={live.recording}
+              onRecording={live.setRecording}
+              onSaveTrack={async () => {
+                let points: [number, number][] = []
+                try {
+                  const body = await ShareLocation.readTrack()
+                  points = body.points ?? []
+                } catch {
+                  points = []
+                }
+                if (points.length < 2) points = readLocalTrack()
+                if (points.length < 2) return
+                const n = project.model.layers.filter((layer) => layer.name.startsWith("Track")).length + 1
+                const name = t("trackName", { n })
+                const id = await project.createPointLayer(name, "LineString")
+                if (!id) return
+                const featureId = await project.createFeature(id, { type: "LineString", coordinates: points }, name)
+                if (!featureId) return
+                await ShareLocation.clearTrack().catch(() => {})
+                clearLocalTrack()
+                setDevicesOpen(false)
+                setOpenLayerId(id)
+                setSheet(true)
+              }}
               onJoined={onJoined}
             />
           ) : sendLayerId && !outcome ? (

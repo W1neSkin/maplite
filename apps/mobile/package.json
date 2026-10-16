@@ -11,9 +11,9 @@
   },
   "dependencies": {
     "@capacitor/android": "^8.5.3",
-    "@cartography/share-location": "file:./plugins/share-location",
     "@capacitor/core": "^8.5.3",
-    "@capacitor/ios": "^8.5.3"
+    "@capacitor/ios": "^8.5.3",
+    "@cartography/share-location": "file:plugins\\share-location"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.3",

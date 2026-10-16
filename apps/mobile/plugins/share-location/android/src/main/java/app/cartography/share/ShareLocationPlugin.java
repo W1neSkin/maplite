@@ -3,6 +3,7 @@ package app.cartography.share;
 import android.Manifest;
 import android.content.Intent;
 import android.os.Build;
+import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
 import com.getcapacitor.PluginCall;
@@ -23,6 +24,7 @@ public class ShareLocationPlugin extends Plugin {
     @PluginMethod
     public void start(PluginCall call) {
         ShareService.save(getContext(), call.getString("server", ""), call.getString("token", ""), call.getString("projectId", ""), call.getString("subjectId", ""), call.getString("name", "Phone"));
+        getContext().getSharedPreferences("share-location", android.content.Context.MODE_PRIVATE).edit().putBoolean("share", true).commit();
         if (getPermissionState("location") != PermissionState.GRANTED) {
             requestPermissionForAlias("location", call, "start");
             return;
@@ -33,6 +35,51 @@ public class ShareLocationPlugin extends Plugin {
             return;
         }
         launch(call);
+    }
+
+    @PluginMethod
+    public void configure(PluginCall call) {
+        boolean share = Boolean.TRUE.equals(call.getBoolean("share", false));
+        boolean record = Boolean.TRUE.equals(call.getBoolean("record", false));
+        getContext().getSharedPreferences("share-location", android.content.Context.MODE_PRIVATE).edit()
+            .putString("server", call.getString("server", ""))
+            .putString("token", call.getString("token", ""))
+            .putString("projectId", call.getString("projectId", ""))
+            .putString("subjectId", call.getString("subjectId", ""))
+            .putString("name", call.getString("name", "Phone"))
+            .putBoolean("share", share)
+            .putBoolean("record", record)
+            .commit();
+        if (!share && !record) {
+            getContext().stopService(new Intent(getContext(), ShareService.class));
+            call.resolve();
+            return;
+        }
+        if (getPermissionState("location") != PermissionState.GRANTED) {
+            requestPermissionForAlias("location", call, "configure");
+            return;
+        }
+        if (Build.VERSION.SDK_INT >= 33 && getPermissionState("notifications") != PermissionState.GRANTED && !askedNotifications) {
+            askedNotifications = true;
+            requestPermissionForAlias("notifications", call, "configure");
+            return;
+        }
+        launch(call);
+    }
+
+    @PluginMethod
+    public void readTrack(PluginCall call) {
+        try {
+            call.resolve(new JSObject("{\"points\":" + TrackFile.read(getContext()).toString() + "}"));
+        } catch (Exception error) {
+            call.reject("Could not read the track");
+        }
+    }
+
+    @PluginMethod
+    public void clearTrack(PluginCall call) {
+        TrackFile.clear(getContext());
+        call.resolve();
     }
 
     @PluginMethod

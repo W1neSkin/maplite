@@ -27,8 +27,8 @@ import java.util.concurrent.Executors;
 import org.json.JSONObject;
 
 /**
- * Keeps publishing the live point after the screen turns off.
- * A foreground notification is required. This does not store a track.
+ * Keeps location running after the screen turns off.
+ * Sharing publishes a live point. Recording stores a line on the phone. They are separate.
  */
 public class ShareService extends Service implements LocationListener {
     private static final String PREFS = "share-location";
@@ -68,7 +68,7 @@ public class ShareService extends Service implements LocationListener {
         handler.removeCallbacks(heartbeat);
         LocationManager manager = (LocationManager) getSystemService(LOCATION_SERVICE);
         if (manager != null) manager.removeUpdates(this);
-        send(null, true);
+        if (getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean("share", false)) send(null, true);
         posts.shutdown();
         super.onDestroy();
     }
@@ -81,6 +81,8 @@ public class ShareService extends Service implements LocationListener {
     @Override
     public void onLocationChanged(Location location) {
         last = location;
+        if (getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean("record", false)) TrackFile.append(this, location);
+        if (!getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean("share", false)) return;
         if (lastSentAt == 0 || location.distanceTo(sent) > 15 || System.currentTimeMillis() - lastSentAt > HEARTBEAT_MS) send(location, false);
     }
 
@@ -88,7 +90,8 @@ public class ShareService extends Service implements LocationListener {
     private final Runnable heartbeat = new Runnable() {
         @Override
         public void run() {
-            if (last != null && System.currentTimeMillis() - lastSentAt >= HEARTBEAT_MS) send(last, false);
+            boolean share = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean("share", false);
+            if (share && last != null && System.currentTimeMillis() - lastSentAt >= HEARTBEAT_MS) send(last, false);
             handler.postDelayed(this, 5_000);
         }
     };
@@ -118,7 +121,7 @@ public class ShareService extends Service implements LocationListener {
             lastSentAt = System.currentTimeMillis();
         }
         posts.execute(() -> post(server, token, projectId, subjectId, name, location, stop));
-        if (stop) prefs.edit().clear().apply();
+        if (stop) prefs.edit().putBoolean("share", false).commit();
     }
 
     private void post(String server, String token, String projectId, String subjectId, String name, Location location, boolean stop) {
@@ -172,6 +175,9 @@ public class ShareService extends Service implements LocationListener {
         Notification.Builder builder = Build.VERSION.SDK_INT >= 26
             ? new Notification.Builder(this, "share-location")
             : new Notification.Builder(this);
-        return builder.setContentTitle(getString(R.string.share_notice)).setSmallIcon(android.R.drawable.ic_menu_mylocation).setOngoing(true).build();
+        boolean record = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean("record", false);
+        boolean share = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean("share", false);
+        int title = record && !share ? R.string.record_notice : R.string.share_notice;
+        return builder.setContentTitle(getString(title)).setSmallIcon(android.R.drawable.ic_menu_mylocation).setOngoing(true).build();
     }
 }

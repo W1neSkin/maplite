@@ -2,4 +2,5 @@
 <resources>
     <string name="share_channel">Location sharing</string>
     <string name="share_notice">Location is being shared</string>
+    <string name="record_notice">Recording a track</string>
 </resources>

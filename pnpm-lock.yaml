@@ -112,7 +112,7 @@ importers:
         specifier: ^8.5.3
         version: 8.5.3(@capacitor/core@8.5.3)
       '@cartography/share-location':
-        specifier: file:./plugins/share-location
+        specifier: file:plugins\share-location
         version: file:apps/mobile/plugins/share-location
     devDependencies:
       '@capacitor/cli':

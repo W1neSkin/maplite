@@ -3,10 +3,12 @@ import { createId } from "@cartography/project-schema"
 import { useEffect, useState } from "react"
 import { clientId, editOrigin, isPhoneApp, type Session } from "./connection.js"
 import { ShareLocation } from "../platform/share-location.js"
+import { appendLocalTrack } from "./track-store.js"
 import { publishLive, readLive, type LiveMessage } from "../sync/channel.js"
 import { watchChanges } from "../sync/api.js"
 
 const SHARE_KEY = "cartography.shareLive"
+const RECORD_KEY = "cartography.recordTrack"
 const HIDE_KEY = "cartography.liveHidden"
 const NAME_KEY = "cartography.deviceName"
 const FRESH_MS = 30_000
@@ -86,6 +88,7 @@ export function useLive(session: Session) {
   const surface = editOrigin().surface
   const subjectId = liveSubjectId(session)
   const [sharing, setSharingState] = useState(() => surface === "device" && localStorage.getItem(SHARE_KEY) === "1")
+  const [recording, setRecordingState] = useState(() => surface === "device" && localStorage.getItem(RECORD_KEY) === "1")
   const [hidden, setHidden] = useState<Set<string>>(() => readSet(HIDE_KEY))
   const [messages, setMessages] = useState<LiveMessage[]>([])
   const [now, setNow] = useState(() => Date.now())
@@ -93,6 +96,11 @@ export function useLive(session: Session) {
   function setSharing(value: boolean) {
     localStorage.setItem(SHARE_KEY, value ? "1" : "0")
     setSharingState(value)
+  }
+
+  function setRecording(value: boolean) {
+    localStorage.setItem(RECORD_KEY, value ? "1" : "0")
+    setRecordingState(value)
   }
 
   function togglePerson(id: string) {
@@ -126,26 +134,26 @@ export function useLive(session: Session) {
 
   useEffect(() => {
     if (surface !== "device") return
-    if (!sharing) {
-      void ShareLocation.stop().catch(() => {})
-      void publishLive(session, { id: subjectId, fixId: createId(), sampledAt: new Date().toISOString(), body: { sharing: false, name: deviceLabel() } })
-      return
-    }
     const handle: { watch: number | null; timer: number | null; native: boolean } = { watch: null, timer: null, native: false }
     let cancel = false
     void (async () => {
-      if (isPhoneApp() && session.projectId) {
+      if (!sharing) void publishLive(session, { id: subjectId, fixId: createId(), sampledAt: new Date().toISOString(), body: { sharing: false, name: deviceLabel() } })
+      if (!session.projectId) return
+      const options = { server: session.server, token: session.token, projectId: session.projectId, subjectId, name: deviceLabel(), share: sharing, record: recording }
+      if (isPhoneApp()) {
         try {
-          await ShareLocation.start({ server: session.server, token: session.token, projectId: session.projectId, subjectId, name: deviceLabel() })
-          handle.native = true
+          await ShareLocation.configure(options)
+          handle.native = sharing || recording
         } catch {
           handle.native = false
         }
       }
-      if (cancel || handle.native || !navigator.geolocation) return
+      if (cancel || handle.native || !navigator.geolocation || (!sharing && !recording)) return
       let last: { coordinate: [number, number]; accuracy: number | null; speed: number | null; course: number | null; sentAt: number } | null = null
       const send = (coordinate: [number, number], accuracy: number | null, speed: number | null, course: number | null, sampledAt: string) => {
         last = { coordinate, accuracy, speed, course, sentAt: Date.now() }
+        if (recording) appendLocalTrack(coordinate, (from, to) => movedEnough(from, to, accuracy))
+        if (!sharing) return
         void publishLive(session, {
           id: subjectId,
           fixId: createId(),
@@ -164,7 +172,7 @@ export function useLive(session: Session) {
         { enableHighAccuracy: true, maximumAge: 5000 },
       )
       handle.timer = window.setInterval(() => {
-        if (!last || Date.now() - last.sentAt < HEARTBEAT_MS) return
+        if (!sharing || !last || Date.now() - last.sentAt < HEARTBEAT_MS) return
         send(last.coordinate, last.accuracy, last.speed, last.course, new Date().toISOString())
       }, 5000)
     })()
@@ -172,11 +180,9 @@ export function useLive(session: Session) {
       cancel = true
       if (handle.watch != null) navigator.geolocation.clearWatch(handle.watch)
       if (handle.timer != null) window.clearInterval(handle.timer)
-      void ShareLocation.stop().catch(() => {})
-      if (!handle.native) void publishLive(session, { id: subjectId, fixId: createId(), sampledAt: new Date().toISOString(), body: { sharing: false, name: deviceLabel() } })
     }
-  }, [session, sharing, subjectId, surface])
+  }, [session, sharing, recording, subjectId, surface])
 
   const view = deviceMessages(messages, now, hidden, subjectId)
-  return { sharing, setSharing, togglePerson, markers: view.markers, people: view.people, surface }
+  return { sharing, setSharing, recording, setRecording, togglePerson, markers: view.markers, people: view.people, surface }
 }

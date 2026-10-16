@@ -4,7 +4,9 @@ import { t } from "../i18n/translate.js"
 import { createEnrollment, readDevices, redeemCode, removeDevice, type DeviceRow } from "../sync/channel.js"
 import { clientId, saveSession, type Session } from "./connection.js"
 import { BasemapPack } from "./basemap-pack.js"
-import { IconButton, PlusIcon, TrashIcon } from "./icons.js"
+import { CheckIcon, IconButton, PlusIcon, TrashIcon } from "./icons.js"
+import { ShareLocation } from "../platform/share-location.js"
+import { readLocalTrack } from "./track-store.js"
 import { deviceLabel, rememberDeviceLabel } from "./use-live.js"
 
 export function DevicesPanel(props: {
@@ -12,6 +14,9 @@ export function DevicesPanel(props: {
   surface: "main" | "device"
   sharing: boolean
   onSharing: (value: boolean) => void
+  recording: boolean
+  onRecording: (value: boolean) => void
+  onSaveTrack: () => Promise<void>
   onJoined: (session: Session) => void
 }) {
   const [devices, setDevices] = useState<DeviceRow[]>([])
@@ -39,6 +44,7 @@ export function DevicesPanel(props: {
           {t("shareLive")}
         </label>
       ) : null}
+      {props.surface === "device" ? <TrackRecord recording={props.recording} onRecording={props.onRecording} onSave={props.onSaveTrack} /> : null}
       {props.surface === "main" ? (
         <>
           <div className="flex items-center gap-1">
@@ -101,6 +107,33 @@ export function DevicesPanel(props: {
           {joinFailed ? <p className="text-xs text-neutral-500">{t("joinFailed")}</p> : null}
         </form>
       ) : null}
+    </div>
+  )
+}
+
+function TrackRecord(props: { recording: boolean; onRecording: (value: boolean) => void; onSave: () => Promise<void> }) {
+  const [count, setCount] = useState(0)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    const load = () => {
+      void ShareLocation.readTrack()
+        .then((body) => setCount(body.points?.length ? body.points.length : readLocalTrack().length))
+        .catch(() => setCount(readLocalTrack().length))
+    }
+    load()
+    const timer = window.setInterval(load, 5000)
+    return () => window.clearInterval(timer)
+  }, [props.recording])
+  return (
+    <div className="flex items-center gap-2">
+      <label className="flex min-w-0 flex-1 items-center gap-2 text-sm">
+        <input type="checkbox" checked={props.recording} onChange={(event) => props.onRecording(event.target.checked)} />
+        <span className="truncate">{t("recordTrack")}</span>
+        {count > 0 ? <span className="shrink-0 text-xs text-neutral-500">{t("trackPoints", { count })}</span> : null}
+      </label>
+      <IconButton tone="accent" aria-label={t("saveTrack")} title={t("saveTrack")} disabled={busy || count < 2} onClick={() => { setBusy(true); void props.onSave().finally(() => setBusy(false)) }}>
+        <CheckIcon />
+      </IconButton>
     </div>
   )
 }
