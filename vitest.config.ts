@@ -6,4 +6,7 @@ export default defineConfig({
     environment: "node",
     testTimeout: 20_000,
   },
+  ssr: {
+    external: ["better-sqlite3"],
+  },
 })

@@ -29,8 +29,10 @@ function median(values: number[]): number {
 
 function enu(origin: Crs84Coordinate, point: Crs84Coordinate): { east: number; north: number } {
   const inverse = geodesic.Inverse(origin[1], origin[0], point[1], point[0])
-  const azimuth = (inverse.azi1 * Math.PI) / 180
-  return { east: inverse.s12 * Math.sin(azimuth), north: inverse.s12 * Math.cos(azimuth) }
+  // The library types these as optional. A normal inverse always returns them.
+  const azimuth = ((inverse.azi1 ?? 0) * Math.PI) / 180
+  const distance = inverse.s12 ?? 0
+  return { east: distance * Math.sin(azimuth), north: distance * Math.cos(azimuth) }
 }
 
 function fromEnu(origin: Crs84Coordinate, east: number, north: number): Crs84Coordinate {
@@ -38,7 +40,7 @@ function fromEnu(origin: Crs84Coordinate, east: number, north: number): Crs84Coo
   if (distance < 1e-6) return origin
   const azimuth = (Math.atan2(east, north) * 180) / Math.PI
   const direct = geodesic.Direct(origin[1], origin[0], azimuth, distance)
-  return [direct.lon2, direct.lat2]
+  return [direct.lon2 ?? origin[0], direct.lat2 ?? origin[1]]
 }
 
 /**

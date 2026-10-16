@@ -1,0 +1,31 @@
+# The process listens on 3847. Put HTTPS on a reverse proxy in front of it.
+# ADMIN_TOKEN must be at least 43 characters. Do not commit the real value.
+services:
+  server:
+    build: .
+    ports:
+      - "3847:3847"
+    environment:
+      PORT: "3847"
+      DATABASE_PATH: /data/cartography.sqlite
+      NODE_ENV: production
+      SEED_DEMO: "true"
+      ALLOW_DEV_CREDENTIALS_FILE: "false"
+      ADMIN_TOKEN: ${ADMIN_TOKEN:?Set ADMIN_TOKEN to a random string of at least 43 characters}
+      CORS_ORIGINS: ${CORS_ORIGINS:-http://127.0.0.1:3848}
+    volumes:
+      - cartography-data:/data
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "node",
+          "-e",
+          "fetch('http://127.0.0.1:3847/health/live').then((response) => process.exit(response.ok ? 0 : 1)).catch(() => process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+volumes:
+  cartography-data:

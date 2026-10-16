@@ -10,18 +10,18 @@
     "node": ">=22"
   },
   "scripts": {
-    "dev": "pnpm --parallel --filter @cartography/server --filter @cartography/client dev",
-    "build": "pnpm -r --if-present build",
-    "typecheck": "pnpm -r --if-present typecheck",
+    "dev": "corepack pnpm --parallel --filter @cartography/server --filter @cartography/client dev",
+    "build": "corepack pnpm -r --filter \"!cartographic-workspace\" --if-present build",
+    "typecheck": "corepack pnpm -r --filter \"!cartographic-workspace\" --if-present typecheck",
     "lint": "eslint . && node scripts/check-boundaries.mjs && node scripts/check-i18n.mjs",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "mobile:sync": "pnpm --filter @cartography/client build && pnpm --filter @cartography/mobile sync",
+    "mobile:sync": "corepack pnpm --filter @cartography/client build && corepack pnpm --filter @cartography/mobile sync",
     "android:build": "bash scripts/ci/android.sh",
-    "ios:prepare": "pnpm --filter @cartography/mobile prepare:ios",
-    "db:migrate": "pnpm --filter @cartography/server db:migrate",
-    "db:verify": "pnpm --filter @cartography/server db:verify",
-    "api:generate": "pnpm --filter @cartography/project-schema api:generate",
+    "ios:prepare": "corepack pnpm --filter @cartography/mobile prepare:ios",
+    "db:migrate": "corepack pnpm --filter @cartography/server db:migrate",
+    "db:verify": "corepack pnpm --filter @cartography/server db:verify",
+    "api:generate": "corepack pnpm --filter @cartography/project-schema api:generate",
     "licenses": "node scripts/check-licenses.mjs"
   },
   "devDependencies": {
@@ -31,5 +31,8 @@
     "typescript": "^5.9.2",
     "typescript-eslint": "^8.44.0",
     "vitest": "^3.2.4"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": ["esbuild"]
   }
 }

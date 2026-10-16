@@ -52,7 +52,7 @@ export function geodesicLength(coordinates: readonly Crs84Coordinate[]): number 
     const previous = coordinates[index - 1]!
     const current = coordinates[index]!
     const inverse = geodesic.Inverse(previous[1], previous[0], current[1], current[0])
-    length += inverse.s12
+    length += inverse.s12 ?? 0
   }
   return length
 }
@@ -65,7 +65,7 @@ function ringArea(ring: Ring): { areaM2: number; perimeterM: number } {
     ring[0]![0] === ring[ring.length - 1]![0] &&
     ring[0]![1] === ring[ring.length - 1]![1]
   const result = polygon.Compute(!closed, true)
-  return { areaM2: Math.abs(result.area), perimeterM: result.perimeter }
+  return { areaM2: Math.abs(result.area ?? 0), perimeterM: result.perimeter ?? 0 }
 }
 
 export function measureLine(coordinates: readonly Crs84Coordinate[]): MeasureResult {

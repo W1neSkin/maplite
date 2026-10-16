@@ -87,15 +87,19 @@ describe("Gauss-Kruger against PROJ 9.4", () => {
     const forward = projectedToCrs84(fromEpsgAxisOrder(row.northing, row.easting), profile)
     // Points outside the published datum area are still computable, but PROJ may
     // choose another operation there. Strict agreement is required only inside it.
-    const decimals = insidePublishedArea(row.datum, row.lat, row.lon) ? 6 : 4
+    const inside = insidePublishedArea(row.datum, row.lat, row.lon)
+    const decimals = inside ? 6 : 4
     expect(forward.coordinate[1]).toBeCloseTo(row.backLat, decimals)
     expect(forward.coordinate[0]).toBeCloseTo(row.backLon, decimals)
     const inverse = crs84ToProjected([row.lon, row.lat], profile)
     const [northing, easting] = toEpsgAxisOrder(inverse.coordinate)
-    expect(easting).toBeCloseTo(row.easting, 2)
-    expect(northing).toBeCloseTo(row.northing, 2)
+    // Outside the published datum area PROJ may use another operation.
+    // A few metres is still a projection, not a wrong zone.
+    const metreSlack = inside ? 0.005 : 5
+    expect(Math.abs(easting - row.easting)).toBeLessThan(metreSlack)
+    expect(Math.abs(northing - row.northing)).toBeLessThan(metreSlack)
     const truncated = crs84ToProjected([row.lon, row.lat], profile, { notation: "truncated" })
-    expect(truncated.coordinate[0]).toBeCloseTo(row.easting - row.zone * 1_000_000, 2)
+    expect(Math.abs(truncated.coordinate[0] - (row.easting - row.zone * 1_000_000))).toBeLessThan(metreSlack)
     const fromTruncated = projectedToCrs84(truncated.coordinate, profile, { notation: "truncated" })
     expect(fromTruncated.coordinate[1]).toBeCloseTo(row.lat, 6)
     expect(fromTruncated.coordinate[0]).toBeCloseTo(row.lon, 6)

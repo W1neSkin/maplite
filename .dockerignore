@@ -1,0 +1,11 @@
+node_modules
+**/dist
+.git
+data
+**/*.sqlite
+apps/mobile/android
+apps/mobile/ios
+apps/mobile/.capacitor
+coverage
+playwright-report
+test-results

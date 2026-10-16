@@ -2,6 +2,12 @@ export const SCHEMA_VERSION = 1
 
 export type GeometryType = "Point" | "LineString" | "Polygon"
 
+/** Who wrote a record. The main window is the browser; a device is the phone app. */
+export type EditOrigin = {
+  surface: "main" | "device"
+  deviceId: string
+}
+
 export type JsonValue = null | boolean | number | string | JsonValue[] | { [key: string]: JsonValue }
 
 export type Crs84Geometry =
@@ -52,6 +58,9 @@ export type Feature = {
   layerId: string
   geometry: Crs84Geometry
   properties: Record<string, JsonValue>
+  createdBy?: EditOrigin
+  updatedBy?: EditOrigin
+  deletedBy?: EditOrigin
   sourceGeometry?: {
     coordinates: JsonValue
     crsProfileId: string

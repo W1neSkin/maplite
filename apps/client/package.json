@@ -1,0 +1,37 @@
+{
+  "name": "@cartography/client",
+  "private": true,
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1 --port 3848",
+    "build": "tsc -p tsconfig.json --noEmit && vite build",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "preview": "vite preview --host 127.0.0.1 --port 3848"
+  },
+  "dependencies": {
+    "@cartography/extension-api": "workspace:*",
+    "@cartography/extension-example": "workspace:*",
+    "@cartography/project-schema": "workspace:*",
+    "@radix-ui/react-slot": "^1.2.3",
+    "class-variance-authority": "^0.7.1",
+    "clsx": "^2.1.1",
+    "ol": "^10.11.0",
+    "qrcode": "^1.5.4",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "tailwind-merge": "^3.7.0"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.3",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/qrcode": "^1.5.6",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^6.1.2",
+    "better-sqlite3": "^13.0.3",
+    "tailwindcss": "^4.3.3",
+    "vite": "^8.3.4"
+  }
+}

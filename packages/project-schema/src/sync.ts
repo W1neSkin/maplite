@@ -1,4 +1,4 @@
-import type { EntityType } from "./entities.js"
+import type { EditOrigin, EntityType } from "./entities.js"
 
 export type SyncOperation = {
   opId: string
@@ -9,11 +9,13 @@ export type SyncOperation = {
   kind: "create" | "update" | "delete"
   baseVersion: number | null
   payload?: unknown
+  origin?: EditOrigin
 }
 
 export type PushRequest = {
   operations: SyncOperation[]
   atomic?: boolean
+  schemaVersion?: number
 }
 
 export type OperationResult =

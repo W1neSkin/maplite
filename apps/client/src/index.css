@@ -1,0 +1,90 @@
+@import "tailwindcss";
+
+:root {
+  --background: #f6f7f9;
+  --foreground: #111827;
+  --card: #ffffff;
+  --border: #e5e7eb;
+  --primary: #2563eb;
+  --primary-foreground: #ffffff;
+  color: var(--foreground);
+  background: var(--background);
+  font-family: "Segoe UI", sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  overflow: hidden;
+}
+
+.map-root {
+  height: 100%;
+  width: 100%;
+  background: #e7e5e4;
+}
+
+.map-placing,
+.map-placing .ol-viewport {
+  cursor: crosshair;
+}
+
+.ol-zoom {
+  left: auto;
+  right: max(8px, env(safe-area-inset-right));
+  top: max(8px, env(safe-area-inset-top));
+  background: transparent;
+  padding: 0;
+  border-radius: 0;
+}
+
+.ol-zoom .ol-zoom-in,
+.ol-zoom .ol-zoom-out {
+  width: 32px;
+  height: 32px;
+  margin: 0;
+  font-size: 16px;
+  line-height: 30px;
+  color: #111827;
+  background: #fff;
+  border: 1px solid rgb(0 0 0 / 10%);
+  border-radius: 999px;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 16%);
+}
+
+.ol-zoom .ol-zoom-out {
+  margin-top: 4px;
+}
+
+.ol-attribution {
+  font-size: 11px;
+  max-width: 46%;
+  bottom: calc(92px + env(safe-area-inset-bottom));
+  right: max(0px, env(safe-area-inset-right));
+}
+
+.ol-attribution:not(.ol-collapsed) {
+  background: rgb(255 253 248 / 90%);
+}
+
+.map-callout {
+  display: flex;
+  max-width: 180px;
+  flex-direction: column;
+  padding: 4px 8px;
+  border-radius: 10px;
+  background: #fff;
+  font-size: 12px;
+  line-height: 1.3;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 16%);
+  pointer-events: none;
+}
+
+.map-callout span {
+  color: #6b7280;
+}
