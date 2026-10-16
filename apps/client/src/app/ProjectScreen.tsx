@@ -247,6 +247,7 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
         onCursor={setCursor}
         onLocated={setCursor}
         onSelect={(id) => { if (id) selectFeature(id); else setSelectedId(null) }}
+        onGeometry={(id, geometry) => project.updateGeometry(id, geometry)}
       />
       {placingLayer ? (
         <PlacingBar

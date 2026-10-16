@@ -1,5 +1,8 @@
 import Feature from "ol/Feature"
 import type { FeatureLike } from "ol/Feature"
+import LineString from "ol/geom/LineString"
+import Point from "ol/geom/Point"
+import Polygon from "ol/geom/Polygon"
 import Circle from "ol/style/Circle"
 import Fill from "ol/style/Fill"
 import Stroke from "ol/style/Stroke"
@@ -18,6 +21,20 @@ function line(color: string, width: number, dashed = false): Stroke {
   return new Stroke({ color, width, lineCap: "round", lineJoin: "round", lineDash: dashed ? [6, 4] : undefined })
 }
 
+/** The edit gesture only marks the vertex under the finger, so the selected shape draws the rest. */
+function vertexHandles(geometry: ReturnType<FeatureLike["getGeometry"]>): Style[] {
+  const coordinates = geometry instanceof LineString
+    ? geometry.getCoordinates()
+    : geometry instanceof Polygon
+      ? (geometry.getCoordinates()[0] ?? []).slice(0, -1)
+      : []
+  return coordinates.map((coordinate) => new Style({
+    geometry: new Point(coordinate),
+    image: new Circle({ radius: 6, fill: new Fill({ color: "#ffffff" }), stroke: new Stroke({ color: BLUE, width: 2 }) }),
+    zIndex: 200001,
+  }))
+}
+
 export function featureStyle(feature: FeatureLike): Style | Style[] {
   const color = String(feature.get("color") ?? "#1f4d3a")
   const fillOpacity = Number(feature.get("fillOpacity") ?? 0.25)
@@ -29,18 +46,20 @@ export function featureStyle(feature: FeatureLike): Style | Style[] {
   const draft = feature.get("draft") === true
   if (type === "LineString") {
     const width = selected ? strokeWidth + 3 : strokeWidth
-    return [
+    const drawn = [
       new Style({ stroke: line("#ffffff", width + (selected ? 5 : 3)), zIndex: rank }),
       new Style({ stroke: line(selected || draft ? BLUE : color, width, draft), zIndex: rank }),
     ]
+    return selected ? [...drawn, ...vertexHandles(feature.getGeometry())] : drawn
   }
   if (type === "Polygon") {
     const opacity = selected ? Math.min(0.65, fillOpacity + 0.3) : fillOpacity
-    return new Style({
+    const drawn = new Style({
       stroke: line(selected || draft ? BLUE : color, selected ? strokeWidth + 1 : strokeWidth, draft),
       fill: new Fill({ color: hexToRgba(color, opacity) }),
       zIndex: rank,
     })
+    return selected ? [drawn, ...vertexHandles(feature.getGeometry())] : drawn
   }
   return new Style({
     image: new Circle({

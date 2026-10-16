@@ -180,11 +180,15 @@ export function useProject(session: Session) {
     void send({ opId: createId(), clientId: clientId(), projectId: session.projectId, entityType: "feature", entityId: id, kind: "delete", baseVersion: versionOf(id) })
   }
 
-  function movePoint(id: string, coordinate: [number, number]) {
+  function updateGeometry(id: string, geometry: Feature["geometry"]) {
     const feature = featureOf(docs, id)
-    if (!feature || feature.geometry.type !== "Point" || !session.projectId) return
-    const geometry: Feature["geometry"] = { type: "Point", coordinates: [Number(coordinate[0].toFixed(6)), Number(coordinate[1].toFixed(6))] }
+    if (!feature || feature.geometry.type !== geometry.type || !session.projectId) return
+    if (JSON.stringify(feature.geometry) === JSON.stringify(geometry)) return
     void send({ opId: createId(), clientId: clientId(), projectId: session.projectId, entityType: "feature", entityId: id, kind: "update", baseVersion: versionOf(id), payload: { ...feature, geometry } })
+  }
+
+  function movePoint(id: string, coordinate: [number, number]) {
+    updateGeometry(id, { type: "Point", coordinates: [Number(coordinate[0].toFixed(6)), Number(coordinate[1].toFixed(6))] })
   }
 
   function reorderLayers(ids: readonly string[]) {
@@ -233,5 +237,5 @@ export function useProject(session: Session) {
     return records
   }
 
-  return { model, loading, failed, setFailed, upgrade, conflict, setConflict, lastSync, pull, send, renameLayer, restyleLayer, deleteLayer, createPointLayer, createPoint, createFeature, renameFeature, deleteFeature, movePoint, reorderLayers, importLayer, recordsIn }
+  return { model, loading, failed, setFailed, upgrade, conflict, setConflict, lastSync, pull, send, renameLayer, restyleLayer, deleteLayer, createPointLayer, createPoint, createFeature, renameFeature, deleteFeature, movePoint, updateGeometry, reorderLayers, importLayer, recordsIn }
 }

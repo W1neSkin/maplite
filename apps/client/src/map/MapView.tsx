@@ -16,6 +16,7 @@ import { DEV_BASEMAP_URL } from "./basemap.js"
 import { FRAME_MARGIN, extentToScreen, frameFeature, panToCenterDelta } from "./frame.js"
 import { HERE_ZOOM, hereStyle, placeHere, readPosition } from "./here.js"
 import { featureStyle, paintFeature } from "./style.js"
+import { attachVertexEdit } from "./vertex-edit.js"
 
 export type MapCallout = { coordinate: [number, number]; title: string; layer: string }
 
@@ -38,6 +39,7 @@ type MapViewProps = {
   onPlace?: (coordinate: [number, number]) => void
   onCursor?: (coordinate: [number, number]) => void
   onLocated?: (coordinate: [number, number]) => void
+  onGeometry?: (featureId: string, geometry: MapFeature["geometry"]) => void
 }
 
 const format = new GeoJSON()
@@ -114,7 +116,7 @@ function showFeature(map: Map, source: VectorSource, id: string, padding: [numbe
   view.fit(extent, { padding: fitted, maxZoom: typeof zoom === "number" ? zoom : 16, duration: 180, size })
 }
 
-export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ features, selectedId = null, placing = false, callout = null, projectionId = null, draft = null, onBasemapFailed, onSelect, onPlace, onCursor, onLocated, onCenter }, ref) {
+export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ features, selectedId = null, placing = false, callout = null, projectionId = null, draft = null, onBasemapFailed, onSelect, onPlace, onCursor, onLocated, onCenter, onGeometry }, ref) {
   const target = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
   const sourceRef = useRef<VectorSource | null>(null)
@@ -127,6 +129,7 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
   const locatedRef = useRef(onLocated)
   const centerRef = useRef(onCenter)
   const placingRef = useRef(placing)
+  const geometryRef = useRef(onGeometry)
   const didFit = useRef(false)
   const hasHere = useRef(false)
   const hereLonLat = useRef<[number, number] | null>(null)
@@ -137,6 +140,7 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
   locatedRef.current = onLocated
   centerRef.current = onCenter
   placingRef.current = placing
+  geometryRef.current = onGeometry
 
   useLayoutEffect(() => {
     const element = target.current
@@ -285,6 +289,16 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
       didFit.current = true
     }
   }, [features, selectedId, projectionId, draft])
+
+  useLayoutEffect(() => {
+    const map = mapRef.current
+    const source = sourceRef.current
+    if (!map || !source || placing || !selectedId) return
+    const feature = source.getFeatureById(selectedId)
+    if (!feature) return
+    const projection = map.getView().getProjection().getCode()
+    return attachVertexEdit(map, feature, projection, (geometry) => geometryRef.current?.(selectedId, geometry))
+  }, [features, selectedId, placing, projectionId, draft])
 
   useLayoutEffect(() => {
     const overlay = calloutOverlay.current
