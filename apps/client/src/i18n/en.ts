@@ -40,6 +40,8 @@ export const messages = {
   latitude: "Latitude",
   noCoordinate: "Tap the map",
   editCoordinate: "Edit coordinates",
+  copyCoordinate: "Copy coordinates",
+  copiedCoordinate: "Copied",
   showLayer: "Show layer",
   hideLayer: "Hide layer",
   moveLayer: "Move layer",

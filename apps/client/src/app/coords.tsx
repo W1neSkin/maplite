@@ -4,9 +4,24 @@ import { t } from "../i18n/translate.js"
 import { fromZonePair, toZonePair, type DisplayDatum } from "../map/display-crs.js"
 import { readPlace } from "../sync/api.js"
 import type { Session } from "./connection.js"
-import { CheckIcon, CloseIcon, IconButton, PencilIcon } from "./icons.js"
+import { CheckIcon, CloseIcon, CopyIcon, IconButton, PencilIcon } from "./icons.js"
 
 const DATA: DisplayDatum[] = ["web", "SK42", "SK95", "GSK2011"]
+
+async function copyText(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text)
+    return true
+  } catch {
+    const area = document.createElement("textarea")
+    area.value = text
+    document.body.append(area)
+    area.select()
+    const ok = document.execCommand("copy")
+    area.remove()
+    return ok
+  }
+}
 
 function datumLabel(datum: DisplayDatum, zone: number | null): string {
   if (datum === "web") return t("crsWeb")
@@ -25,6 +40,7 @@ export function CoordBar(props: {
   value: [number, number] | null
   editing: boolean
   canEdit: boolean
+  canCopy: boolean
   session: Session
   datum: DisplayDatum
   zone: number | null
@@ -40,6 +56,7 @@ export function CoordBar(props: {
   const [lat, setLat] = useState("")
   const [place, setPlace] = useState("")
   const [open, setOpen] = useState(false)
+  const [copied, setCopied] = useState(false)
   useEffect(() => {
     if (!props.value) {
       setLon("")
@@ -118,6 +135,17 @@ export function CoordBar(props: {
                 </li>
               ))}
             </ul>
+          ) : null}
+          {props.canCopy ? (
+            <IconButton aria-label={t("copyCoordinate")} title={copied ? t("copiedCoordinate") : t("copyCoordinate")} onClick={() => {
+              void copyText(shown).then((ok) => {
+                if (!ok) return
+                setCopied(true)
+                window.setTimeout(() => setCopied(false), 1200)
+              })
+            }}>
+              <CopyIcon />
+            </IconButton>
           ) : null}
           {props.canEdit ? (
             <IconButton aria-label={t("editCoordinate")} title={t("editCoordinate")} onClick={props.onEdit}>

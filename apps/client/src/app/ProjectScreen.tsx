@@ -401,6 +401,7 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
         value={coordValue}
         editing={coordEdit}
         canEdit={placingLayerId !== null || selectedPoint !== null}
+        canCopy={selectedPoint !== null && placingLayerId === null}
         session={session}
         datum={datum}
         zone={activeProfile?.zone ?? null}
