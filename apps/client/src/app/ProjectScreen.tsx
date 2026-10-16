@@ -19,7 +19,7 @@ import { saveZip } from "../import/save-zip.js"
 import { layerZip } from "../import/write-shp.js"
 import { formatLength } from "../i18n/format.js"
 import { t } from "../i18n/translate.js"
-import { LayerStyle } from "./layer-style.js"
+import { labelFields, LayerStyle } from "./layer-style.js"
 import { LayerActions, LayerBrowser } from "./layers.js"
 import { moveItem } from "./order.js"
 import { Sheet } from "./Sheet.js"
@@ -377,8 +377,11 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
               color={openLayer.color}
               fillOpacity={openLayer.fillOpacity}
               geometryType={openLayer.geometryType}
+              labelAttribute={openLayer.labelAttribute}
+              fields={labelFields(project.recordsIn(openLayer.id))}
               onColor={(color) => project.restyleLayer(openLayer.id, { color })}
               onOpacity={(fillOpacity) => project.restyleLayer(openLayer.id, { fillOpacity })}
+              onLabel={(labelAttribute) => project.restyleLayer(openLayer.id, { labelAttribute })}
             />
           ) : null}
           <LayerBrowser

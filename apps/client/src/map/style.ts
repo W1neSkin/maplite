@@ -7,6 +7,7 @@ import Circle from "ol/style/Circle"
 import Fill from "ol/style/Fill"
 import Stroke from "ol/style/Stroke"
 import Style from "ol/style/Style"
+import Text from "ol/style/Text"
 
 const BLUE = "#2563eb"
 
@@ -35,6 +36,25 @@ function vertexHandles(geometry: ReturnType<FeatureLike["getGeometry"]>): Style[
   }))
 }
 
+function withLabel(feature: FeatureLike, styles: Style[], rank: number): Style[] {
+  const text = feature.get("label")
+  if (typeof text !== "string" || text === "" || feature.get("draft") === true) return styles
+  const type = feature.getGeometry()?.getType()
+  styles.push(new Style({
+    text: new Text({
+      text,
+      font: "600 12px sans-serif",
+      fill: new Fill({ color: "#111827" }),
+      stroke: new Stroke({ color: "#ffffff", width: 3 }),
+      placement: type === "LineString" ? "line" : "point",
+      offsetY: type === "Point" ? -18 : 0,
+      overflow: true,
+    }),
+    zIndex: rank + 1,
+  }))
+  return styles
+}
+
 export function featureStyle(feature: FeatureLike): Style | Style[] {
   const color = String(feature.get("color") ?? "#1f4d3a")
   const fillOpacity = Number(feature.get("fillOpacity") ?? 0.25)
@@ -50,7 +70,7 @@ export function featureStyle(feature: FeatureLike): Style | Style[] {
       new Style({ stroke: line("#ffffff", width + (selected ? 5 : 3)), zIndex: rank }),
       new Style({ stroke: line(selected || draft ? BLUE : color, width, draft), zIndex: rank }),
     ]
-    return selected ? [...drawn, ...vertexHandles(feature.getGeometry())] : drawn
+    return withLabel(feature, selected ? [...drawn, ...vertexHandles(feature.getGeometry())] : drawn, rank)
   }
   if (type === "Polygon") {
     const opacity = selected ? Math.min(0.65, fillOpacity + 0.3) : fillOpacity
@@ -59,16 +79,16 @@ export function featureStyle(feature: FeatureLike): Style | Style[] {
       fill: new Fill({ color: hexToRgba(color, opacity) }),
       zIndex: rank,
     })
-    return selected ? [drawn, ...vertexHandles(feature.getGeometry())] : drawn
+    return withLabel(feature, selected ? [drawn, ...vertexHandles(feature.getGeometry())] : [drawn], rank)
   }
-  return new Style({
+  return withLabel(feature, [new Style({
     image: new Circle({
       radius: selected ? 12 : 8,
       fill: new Fill({ color }),
       stroke: new Stroke({ color: selected ? BLUE : "#ffffff", width: selected ? 3 : 2 }),
     }),
     zIndex: rank,
-  })
+  })], rank)
 }
 
 export function paintFeature(feature: Feature, color: string, fillOpacity: number, strokeWidth: number): void {

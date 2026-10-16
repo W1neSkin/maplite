@@ -6,6 +6,7 @@ export type MapLayer = {
   geometryType: Layer["geometryType"]
   color: string
   fillOpacity: number
+  labelAttribute: string | null
   count: number
 }
 
@@ -18,11 +19,20 @@ export type MapFeature = {
   fillOpacity: number
   strokeWidth: number
   stack: number
+  label: string | null
 }
 
 export type MapModel = {
   layers: MapLayer[]
   features: MapFeature[]
+}
+
+function labelText(properties: Feature["properties"], key: string | null): string | null {
+  if (!key) return null
+  const value = properties[key]
+  if (typeof value === "string") return value.trim() ? value : null
+  if (typeof value === "number" || typeof value === "boolean") return String(value)
+  return null
 }
 
 /** Importing layers stay hidden until their last update marks them ready. */
@@ -52,6 +62,7 @@ export function buildMapModel(snapshot: SnapshotResponse): MapModel {
       fillOpacity: layer.style.fillOpacity,
       strokeWidth: layer.style.strokeWidth,
       stack: stackOf.get(layer.id) ?? 0,
+      label: labelText(feature.properties, layer.style.labelAttribute),
     })
   }
   return {
@@ -61,6 +72,7 @@ export function buildMapModel(snapshot: SnapshotResponse): MapModel {
         geometryType: layer.geometryType,
         color: layer.style.color,
         fillOpacity: layer.style.fillOpacity,
+        labelAttribute: layer.style.labelAttribute,
         count: features.filter((feature) => feature.layerId === layer.id).length,
       })),
     features,

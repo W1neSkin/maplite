@@ -143,15 +143,16 @@ export function useProject(session: Session) {
     await send({ opId: createId(), clientId: clientId(), projectId: session.projectId, entityType: "layer", entityId: id, kind: "update", baseVersion: versionOf(id), payload: { ...layer, name } })
   }
 
-  function restyleLayer(id: string, patch: { color?: string; fillOpacity?: number }) {
+  function restyleLayer(id: string, patch: { color?: string; fillOpacity?: number; labelAttribute?: string | null }) {
     const layer = layerOf(docs, id)
     if (!layer || !session.projectId) return
     const color = patch.color ?? layer.style.color
     const fillOpacity = patch.fillOpacity ?? layer.style.fillOpacity
+    const labelAttribute = patch.labelAttribute === undefined ? layer.style.labelAttribute : patch.labelAttribute
     if (!/^#[0-9a-f]{6}$/i.test(color)) return
     const nextOpacity = Math.min(1, Math.max(0, fillOpacity))
-    if (color.toLowerCase() === layer.style.color.toLowerCase() && nextOpacity === layer.style.fillOpacity) return
-    void send({ opId: createId(), clientId: clientId(), projectId: session.projectId, entityType: "layer", entityId: id, kind: "update", baseVersion: versionOf(id), payload: { ...layer, style: { ...layer.style, color, fillOpacity: nextOpacity } } })
+    if (color.toLowerCase() === layer.style.color.toLowerCase() && nextOpacity === layer.style.fillOpacity && labelAttribute === layer.style.labelAttribute) return
+    void send({ opId: createId(), clientId: clientId(), projectId: session.projectId, entityType: "layer", entityId: id, kind: "update", baseVersion: versionOf(id), payload: { ...layer, style: { ...layer.style, color, fillOpacity: nextOpacity, labelAttribute } } })
   }
 
   async function deleteLayer(id: string): Promise<boolean> {

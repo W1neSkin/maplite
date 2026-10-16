@@ -24,7 +24,7 @@ const snapshot: SnapshotResponse = {
         groupId: null,
         name: "Points of interest",
         geometryType: "Point",
-        style: { color: "#1f4d3a", fillOpacity: 0, strokeWidth: 2, labelAttribute: null },
+        style: { color: "#1f4d3a", fillOpacity: 0, strokeWidth: 2, labelAttribute: "name" },
         source: null,
         status: "ready",
         order: 1,
@@ -87,6 +87,8 @@ describe("map model", () => {
     expect(model.layers.map((layer) => layer.name)).toEqual(["Points of interest"])
     expect(model.layers[0]?.color).toBe("#1f4d3a")
     expect(model.features[0]?.color).toBe("#1f4d3a")
+    expect(model.features[0]?.label).toBe("North gate")
+    expect(model.layers[0]?.labelAttribute).toBe("name")
     expect(model.features.map((feature) => feature.name)).toEqual(["North gate"])
   })
 

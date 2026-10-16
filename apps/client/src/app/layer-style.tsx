@@ -18,8 +18,21 @@ type LayerStyleProps = {
   color: string
   fillOpacity: number
   geometryType: MapLayer["geometryType"]
+  labelAttribute: string | null
+  fields: readonly string[]
   onColor: (color: string) => void
   onOpacity: (fillOpacity: number) => void
+  onLabel: (field: string | null) => void
+}
+
+export function labelFields(records: readonly { properties: Record<string, unknown> }[]): string[] {
+  const names = new Set<string>()
+  for (const record of records) {
+    for (const [key, value] of Object.entries(record.properties)) {
+      if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") names.add(key)
+    }
+  }
+  return [...names]
 }
 
 /** The palette stays closed. Color is set rarely, so it must not sit on the layer title. */
@@ -47,6 +60,18 @@ export function LayerStyle(props: LayerStyleProps) {
           )
         })}
       </div>
+      {props.fields.length > 0 ? (
+        <div className="flex flex-wrap gap-1">
+          <button type="button" aria-label={t("labelOff")} aria-pressed={props.labelAttribute == null} className={props.labelAttribute == null ? "h-7 rounded-full bg-neutral-900 px-2 text-xs text-white" : "h-7 rounded-full bg-white px-2 text-xs"} onClick={() => props.onLabel(null)}>
+            {t("labelOff")}
+          </button>
+          {props.fields.map((field) => (
+            <button key={field} type="button" aria-label={t("labelField", { name: field })} aria-pressed={props.labelAttribute === field} className={props.labelAttribute === field ? "h-7 rounded-full bg-neutral-900 px-2 text-xs text-white" : "h-7 rounded-full bg-white px-2 text-xs"} onClick={() => props.onLabel(field)}>
+              {field}
+            </button>
+          ))}
+        </div>
+      ) : null}
       {props.geometryType === "Polygon" ? (
         <input
           type="range"

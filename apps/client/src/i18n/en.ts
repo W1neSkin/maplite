@@ -95,6 +95,8 @@ export const messages = {
   colorViolet: "Violet",
   colorTeal: "Teal",
   fillOpacity: "Fill opacity",
+  labelOff: "No label",
+  labelField: "Label {name}",
   fillOpacityValue: "{n} percent",
   createLayer: "Create",
   deleteFeature: "Delete",

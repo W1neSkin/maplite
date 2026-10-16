@@ -77,6 +77,7 @@ function toOlFeature(feature: MapFeature, selected: boolean, projection: string)
   olFeature.setId(feature.id)
   olFeature.set("selected", selected)
   olFeature.set("stack", feature.stack)
+  olFeature.set("label", feature.label ?? "")
   return olFeature
 }
 
@@ -280,7 +281,7 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
         : draft.type === "Polygon" && draft.coordinates.length >= 3
           ? { type: "Polygon" as const, coordinates: [[...draft.coordinates, draft.coordinates[0]!]] }
           : { type: "LineString" as const, coordinates: draft.coordinates }
-      const sketch = toOlFeature({ id: "draft", name: "", layerId: "", geometry, color: "#2563eb", fillOpacity: 0.15, strokeWidth: 2, stack: 200000 }, false, projection)
+      const sketch = toOlFeature({ id: "draft", name: "", layerId: "", geometry, color: "#2563eb", fillOpacity: 0.15, strokeWidth: 2, stack: 200000, label: null }, false, projection)
       sketch.setId(undefined)
       sketch.set("draft", true)
       source.addFeature(sketch)
