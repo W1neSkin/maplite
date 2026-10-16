@@ -3,6 +3,7 @@ import { formatWhen } from "../i18n/format.js"
 import { t } from "../i18n/translate.js"
 import { createEnrollment, readDevices, redeemCode, removeDevice, type DeviceRow } from "../sync/channel.js"
 import { clientId, saveSession, type Session } from "./connection.js"
+import { BasemapPack } from "./basemap-pack.js"
 import { EyeIcon, EyeOffIcon, IconButton, PlusIcon, TrashIcon } from "./icons.js"
 import type { LivePerson } from "./use-live.js"
 import { rememberDeviceLabel } from "./use-live.js"
@@ -33,6 +34,7 @@ export function DevicesPanel(props: {
 
   return (
     <div className="flex flex-col gap-2">
+      <BasemapPack />
       {props.surface === "device" ? (
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={props.sharing} onChange={(event) => props.onSharing(event.target.checked)} />

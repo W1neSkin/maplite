@@ -7,6 +7,7 @@ import GeoJSON from "ol/format/GeoJSON"
 import Feature from "ol/Feature"
 import LineString from "ol/geom/LineString"
 import Point from "ol/geom/Point"
+import ImageTile from "ol/ImageTile"
 import Overlay from "ol/Overlay"
 import TileLayer from "ol/layer/Tile"
 import VectorLayer from "ol/layer/Vector"
@@ -17,11 +18,12 @@ import Stroke from "ol/style/Stroke"
 import Style from "ol/style/Style"
 import Text from "ol/style/Text"
 import { fromLonLat, get as getProjection, transform } from "ol/proj"
-import OSM from "ol/source/OSM"
+import XYZ from "ol/source/XYZ"
 import VectorSource from "ol/source/Vector"
 import { t } from "../i18n/translate.js"
 import type { MapFeature } from "../app/model.js"
 import { DEV_BASEMAP_URL } from "./basemap.js"
+import { readTile, rememberTile, watchTiles } from "./tile-cache.js"
 import { FRAME_MARGIN, extentToScreen, frameFeature, panToCenterDelta } from "./frame.js"
 import { HERE_ZOOM, hereStyle, placeHere, readPosition } from "./here.js"
 import { updateKmGrid } from "./km-grid.js"
@@ -161,7 +163,42 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
   useLayoutEffect(() => {
     const element = target.current
     if (!element) return
-    const tiles = new OSM({ url: DEV_BASEMAP_URL, attributions: "© OpenStreetMap contributors", crossOrigin: "anonymous" })
+    const tiles = new XYZ({
+      url: DEV_BASEMAP_URL,
+      attributions: "© OpenStreetMap contributors",
+      crossOrigin: "anonymous",
+      tileLoadFunction: (tile, src) => {
+        if (!(tile instanceof ImageTile)) return
+        const image = tile.getImage()
+        if (!(image instanceof HTMLImageElement)) return
+        const parts = src.split("/")
+        const key = `${parts[parts.length - 3]}/${parts[parts.length - 2]}/${parts[parts.length - 1]?.replace(".png", "")}`
+        const show = (blob: Blob) => {
+          const url = URL.createObjectURL(blob)
+          image.onload = () => URL.revokeObjectURL(url)
+          image.onerror = () => URL.revokeObjectURL(url)
+          image.src = url
+        }
+        void readTile(key).then(async (cached) => {
+          if (cached) {
+            show(cached)
+            return
+          }
+          try {
+            const response = await fetch(src)
+            if (!response.ok) throw new Error("tile")
+            const blob = await response.blob()
+            void rememberTile(key, blob)
+            show(blob)
+          } catch {
+            image.src = src
+          }
+        }).catch(() => {
+          image.src = src
+        })
+      },
+    })
+    const stopTiles = watchTiles(() => tiles.refresh())
     const vectors = new VectorSource()
     const grid = new VectorSource()
     const here = new VectorSource()
@@ -273,6 +310,7 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
       map.un("singleclick", onClick)
       map.un("moveend", onMove)
       map.getView().un("change:rotation", onRotate)
+      stopTiles()
       tiles.un("tileloaderror", onError)
       tiles.un("tileloadend", onLoad)
       map.setTarget(undefined)
