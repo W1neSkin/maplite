@@ -245,7 +245,14 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
     const moved = transform(geographic, "EPSG:4326", next)
     const rotationNow = view.getRotation()
     const resolution = view.getResolution()
-    map.setView(new View({ projection: next, center: moved, resolution, rotation: rotationNow, extent: next === "EPSG:3857" ? undefined : getProjection(next)?.getExtent() }))
+    map.setView(new View({
+      projection: next,
+      center: moved,
+      resolution,
+      rotation: rotationNow,
+      wrapX: next === "EPSG:3857",
+      extent: next === "EPSG:3857" ? undefined : getProjection(next)?.getExtent(),
+    }))
     const fix = hereLonLat.current
     const here = hereRef.current
     if (fix && here) placeHere(here, transform(fix, "EPSG:4326", next))
