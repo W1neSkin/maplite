@@ -1,5 +1,7 @@
 import { useEffect, useState, type Ref } from "react"
 import { t } from "../i18n/translate.js"
+import { readPlace } from "../sync/api.js"
+import type { Session } from "./connection.js"
 import { CheckIcon, CloseIcon, IconButton, PencilIcon } from "./icons.js"
 
 function parseDegree(text: string, limit: number): number | null {
@@ -13,16 +15,40 @@ export function CoordBar(props: {
   value: [number, number] | null
   editing: boolean
   canEdit: boolean
+  session: Session
   onEdit: () => void
   onCancel: () => void
   onSave: (coordinate: [number, number]) => void
 }) {
   const [lon, setLon] = useState("")
   const [lat, setLat] = useState("")
+  const [place, setPlace] = useState("")
   useEffect(() => {
     setLon(props.value ? props.value[0].toFixed(6) : "")
     setLat(props.value ? props.value[1].toFixed(6) : "")
   }, [props.value, props.editing])
+  const longitude = props.value?.[0]
+  const latitude = props.value?.[1]
+  useEffect(() => {
+    if (longitude == null || latitude == null) {
+      setPlace("")
+      return
+    }
+    const controller = new AbortController()
+    const timer = window.setTimeout(() => {
+      void readPlace(props.session, longitude, latitude, controller.signal)
+        .then((label) => {
+          if (!controller.signal.aborted) setPlace(label)
+        })
+        .catch(() => {
+          if (!controller.signal.aborted) setPlace("")
+        })
+    }, 400)
+    return () => {
+      controller.abort()
+      window.clearTimeout(timer)
+    }
+  }, [longitude, latitude, props.session])
   const parsedLon = parseDegree(lon, 180)
   const parsedLat = parseDegree(lat, 90)
   return (
@@ -47,7 +73,8 @@ export function CoordBar(props: {
         </form>
       ) : (
         <>
-          <span className="min-w-0 flex-1 truncate px-1 tabular-nums text-neutral-700">{props.value ? `${props.value[0].toFixed(6)}, ${props.value[1].toFixed(6)}` : t("noCoordinate")}</span>
+          <span className="shrink-0 px-1 tabular-nums text-neutral-700">{props.value ? `${props.value[0].toFixed(6)}, ${props.value[1].toFixed(6)}` : t("noCoordinate")}</span>
+          {place ? <span className="min-w-0 flex-1 truncate text-neutral-500">{place}</span> : <span className="flex-1" />}
           {props.canEdit ? (
             <IconButton aria-label={t("editCoordinate")} title={t("editCoordinate")} onClick={props.onEdit}>
               <PencilIcon />

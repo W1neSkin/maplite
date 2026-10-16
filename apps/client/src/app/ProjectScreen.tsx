@@ -290,6 +290,7 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
         value={coordValue}
         editing={coordEdit}
         canEdit={placingLayerId !== null || selectedPoint !== null}
+        session={session}
         onEdit={() => setCoordEdit(true)}
         onCancel={() => setCoordEdit(false)}
         onSave={(coordinate) => {

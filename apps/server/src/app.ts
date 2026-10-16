@@ -14,6 +14,7 @@ import { snapshotRoutes } from "./routes/snapshot.js"
 import { syncRoutes } from "./routes/sync.js"
 import { deviceRoutes } from "./routes/devices.js"
 import { systemRoutes } from "./routes/system.js"
+import { placeRoutes } from "./routes/place.js"
 
 export function createApp(db: AppDatabase, config: ServerConfig, options: { migrationsDir: string }) {
   const app = new Hono<AppEnv>()
@@ -70,6 +71,7 @@ export function createApp(db: AppDatabase, config: ServerConfig, options: { migr
   app.route("/", snapshotRoutes(db, config))
   app.route("/", syncRoutes(db, config))
   app.route("/", deviceRoutes(db, config))
+  app.route("/", placeRoutes(db, config))
 
   app.notFound((c) => apiError(c, 404, "not_found", "Not found"))
   app.onError((error, c) => {

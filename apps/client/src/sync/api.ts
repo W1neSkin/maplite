@@ -6,6 +6,17 @@ function headers(token: string): HeadersInit {
   return { Authorization: `Bearer ${token}`, "Content-Type": "application/json" }
 }
 
+export async function readPlace(session: Session, longitude: number, latitude: number, signal: AbortSignal): Promise<string> {
+  const url = new URL(`${session.server}/api/v1/place`)
+  url.searchParams.set("longitude", String(longitude))
+  url.searchParams.set("latitude", String(latitude))
+  url.searchParams.set("lang", navigator.language.split("-")[0] || "en")
+  const response = await fetch(url, { headers: { Authorization: `Bearer ${session.token}` }, signal })
+  if (!response.ok) return ""
+  const body = (await response.json()) as { label?: unknown }
+  return typeof body.label === "string" ? body.label : ""
+}
+
 export async function readSessionRole(server: string, token: string): Promise<{ role: "admin" | "project"; projectId: string | null }> {
   const response = await fetch(`${server}/api/v1/session`, { headers: { Authorization: `Bearer ${token}` } })
   if (response.status === 401) throw new Error("auth")
