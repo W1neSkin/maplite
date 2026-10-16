@@ -43,6 +43,14 @@ export type Layer = {
   status: "importing" | "ready"
   derivedFrom?: { layerId: string; pointIds: string[] }
   order: number
+  /**
+   * A sent copy, frozen at send time. The source layer keeps changing on its own.
+   * A later send of the same source replaces this copy instead of adding another.
+   */
+  delivery?: {
+    sourceLayerId: string
+    audience: "all" | string[]
+  }
 }
 
 export type LayerGroup = {

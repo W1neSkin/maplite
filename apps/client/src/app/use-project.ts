@@ -5,6 +5,7 @@ import { clientId, editOrigin, type Session } from "./connection.js"
 import { buildMapModel, type MapModel } from "./model.js"
 import { pushOps, readAll, readChanges, watchChanges } from "../sync/api.js"
 import { applyRemote } from "../sync/edits.js"
+import { deliveryOperations } from "./delivery.js"
 import { historyStep, stampForNow, type HistoryStep } from "./undo.js"
 
 export type Conflict = { operation: SyncOperation; serverVersion: number; serverPayload: unknown; serverDeleted: boolean }
@@ -76,7 +77,9 @@ export function useProject(session: Session) {
 
   useEffect(() => {
     const controller = new AbortController()
-    void watchChanges(session, controller.signal, () => void pull().catch(() => setFailed(true)))
+    void watchChanges(session, controller.signal, (event) => {
+      if (event === "changes-available") void pull().catch(() => setFailed(true))
+    })
     const timer = window.setInterval(() => void pull().catch(() => setFailed(true)), 20_000)
     return () => {
       controller.abort()
@@ -305,6 +308,37 @@ export function useProject(session: Session) {
     void sendMany(operations)
   }
 
+  async function sendLayer(sourceId: string, audience: "all" | string[]): Promise<boolean> {
+    const source = layerOf(docs, sourceId)
+    if (!source || source.delivery || !session.projectId) return false
+    const features = recordsIn(sourceId)
+    let existing: { layer: Layer; version: number; features: { id: string; version: number }[] } | null = null
+    for (const item of docs) {
+      if (item.deleted || item.entityType !== "layer") continue
+      const layer = item.payload as Layer
+      if (layer.delivery?.sourceLayerId !== sourceId) continue
+      const copies: { id: string; version: number }[] = []
+      for (const row of docs) {
+        if (row.deleted || row.entityType !== "feature") continue
+        const feature = row.payload as Feature
+        if (feature.layerId === layer.id) copies.push({ id: feature.id, version: row.version })
+      }
+      existing = { layer, version: item.version, features: copies }
+      break
+    }
+    const operations = deliveryOperations({
+      projectId: session.projectId,
+      clientId: clientId(),
+      source,
+      features,
+      existing,
+      audience,
+      order: docs.filter((item) => item.entityType === "layer" && !item.deleted).length,
+    })
+    if (!operations) return false
+    return sendMany(operations, true, false)
+  }
+
   function recordsIn(layerId: string): Feature[] {
     const records: Feature[] = []
     for (const item of docs) {
@@ -316,5 +350,5 @@ export function useProject(session: Session) {
   }
 
   const controlPoints = docs.filter((item) => item.entityType === "controlPoint" && !item.deleted).map((item) => item.payload as ControlPoint)
-  return { model, loading, failed, setFailed, upgrade, conflict, setConflict, lastSync, pull, send, renameLayer, restyleLayer, deleteLayer, createPointLayer, createGroup, setLayerGroup, createPoint, createFeature, renameFeature, deleteFeature, movePoint, updateGeometry, reorderLayers, importLayer, recordsIn, controlPoints, addControlPoint, deleteControlPoint, seatFeatures, canUndo: history.undo > 0, canRedo: history.redo > 0, undo: () => play("undo"), redo: () => play("redo") }
+  return { model, loading, failed, setFailed, upgrade, conflict, setConflict, lastSync, pull, send, renameLayer, restyleLayer, deleteLayer, createPointLayer, createGroup, setLayerGroup, createPoint, createFeature, renameFeature, deleteFeature, movePoint, updateGeometry, reorderLayers, importLayer, recordsIn, sendLayer, controlPoints, addControlPoint, deleteControlPoint, seatFeatures, canUndo: history.undo > 0, canRedo: history.redo > 0, undo: () => play("undo"), redo: () => play("redo") }
 }

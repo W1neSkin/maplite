@@ -9,6 +9,7 @@ export type MapLayer = {
   labelAttribute: string | null
   groupId: string | null
   count: number
+  delivery: Layer["delivery"] | null
 }
 
 export type MapGroup = {
@@ -100,6 +101,7 @@ export function buildMapModel(snapshot: SnapshotResponse): MapModel {
         labelAttribute: layer.style.labelAttribute,
         groupId: layer.groupId,
         count: features.filter((feature) => feature.layerId === layer.id).length,
+        delivery: layer.delivery ?? null,
       })),
     groups,
     features,

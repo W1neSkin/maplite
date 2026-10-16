@@ -4,9 +4,12 @@ import View from "ol/View"
 import Attribution from "ol/control/Attribution"
 import Zoom from "ol/control/Zoom"
 import GeoJSON from "ol/format/GeoJSON"
+import Feature from "ol/Feature"
+import Point from "ol/geom/Point"
 import Overlay from "ol/Overlay"
 import TileLayer from "ol/layer/Tile"
 import VectorLayer from "ol/layer/Vector"
+import Circle from "ol/style/Circle"
 import Fill from "ol/style/Fill"
 import Stroke from "ol/style/Stroke"
 import Style from "ol/style/Style"
@@ -25,6 +28,8 @@ import { attachVertexEdit } from "./vertex-edit.js"
 
 export type MapCallout = { coordinate: [number, number]; title: string; layer: string }
 
+export type LiveMarker = { id: string; name: string; coordinate: [number, number]; faded: boolean }
+
 export type MapHandle = {
   fit(): void
   fitBox(box: [number, number, number, number]): void
@@ -39,6 +44,7 @@ type MapViewProps = {
   callout?: MapCallout | null
   projectionId?: string | null
   draft?: { type: "LineString" | "Polygon"; coordinates: [number, number][] } | null
+  live?: readonly LiveMarker[]
   onBasemapFailed: (failed: boolean) => void
   onCenter?: (coordinate: [number, number]) => void
   onSelect?: (featureId: string | null) => void
@@ -123,11 +129,12 @@ function showFeature(map: Map, source: VectorSource, id: string, padding: [numbe
   view.fit(extent, { padding: fitted, maxZoom: typeof zoom === "number" ? zoom : 16, duration: 180, size })
 }
 
-export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ features, selectedId = null, placing = false, callout = null, projectionId = null, draft = null, onBasemapFailed, onSelect, onPlace, onCursor, onLocated, onCenter, onGeometry }, ref) {
+export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ features, selectedId = null, placing = false, callout = null, projectionId = null, draft = null, live = [], onBasemapFailed, onSelect, onPlace, onCursor, onLocated, onCenter, onGeometry }, ref) {
   const target = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
   const sourceRef = useRef<VectorSource | null>(null)
   const hereRef = useRef<VectorSource | null>(null)
+  const liveRef = useRef<VectorSource | null>(null)
   const calloutOverlay = useRef<Overlay | null>(null)
   const calloutElement = useRef<HTMLDivElement | null>(null)
   const selectRef = useRef(onSelect)
@@ -158,6 +165,18 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
     const here = new VectorSource()
     const hereLayer = new VectorLayer({ source: here, style: hereStyle() })
     hereLayer.set("kind", "here")
+    const liveSource = new VectorSource()
+    const liveLayer = new VectorLayer({
+      source: liveSource,
+      style: (feature) => {
+        const faded = feature.get("faded") === true
+        return new Style({
+          image: new Circle({ radius: 7, fill: new Fill({ color: faded ? "rgba(180,83,9,0.35)" : "#b45309" }), stroke: new Stroke({ color: "#ffffff", width: 2 }) }),
+          text: new Text({ text: String(feature.get("name") ?? ""), offsetY: -16, font: "12px sans-serif", fill: new Fill({ color: faded ? "rgba(17,24,39,0.45)" : "#111827" }), stroke: new Stroke({ color: "#ffffff", width: 3 }) }),
+        })
+      },
+    })
+    liveLayer.set("kind", "live")
     const bubble = document.createElement("div")
     bubble.className = "map-callout"
     const bubbleOverlay = new Overlay({ element: bubble, positioning: "bottom-center", offset: [0, -14], stopEvent: false })
@@ -170,7 +189,7 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
           stroke: new Stroke({ color: "rgba(17,24,39,0.28)", width: 1 }),
           text: new Text({ text: String(feature.get("label") ?? ""), font: "11px sans-serif", fill: new Fill({ color: "#111827" }), stroke: new Stroke({ color: "#ffffff", width: 3 }), placement: "line" }),
         }),
-      }), new VectorLayer({ source: vectors, style: featureStyle }), hereLayer],
+      }), new VectorLayer({ source: vectors, style: featureStyle }), liveLayer, hereLayer],
       view: new View({ center: fromLonLat([-0.166, 51.507]), zoom: 13 }),
     })
     map.addOverlay(bubbleOverlay)
@@ -193,6 +212,7 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
     mapRef.current = map
     sourceRef.current = vectors
     hereRef.current = here
+    liveRef.current = liveSource
     calloutOverlay.current = bubbleOverlay
     calloutElement.current = bubble
     const onClick = (event: { pixel: number[]; coordinate?: number[] }) => {
@@ -210,7 +230,7 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
         if (typeof id !== "string") return undefined
         found = id
         return id
-      }, { hitTolerance: HIT_TOLERANCE, layerFilter: (layer) => layer.get("kind") !== "here" })
+      }, { hitTolerance: HIT_TOLERANCE, layerFilter: (layer) => layer.get("kind") !== "here" && layer.get("kind") !== "live" })
       selectRef.current?.(found)
     }
     map.on("singleclick", onClick)
@@ -248,6 +268,7 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
       mapRef.current = null
       sourceRef.current = null
       hereRef.current = null
+      liveRef.current = null
       calloutOverlay.current = null
       calloutElement.current = null
       didFit.current = false
@@ -305,6 +326,20 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
       didFit.current = true
     }
   }, [features, selectedId, projectionId, draft])
+
+  useLayoutEffect(() => {
+    const map = mapRef.current
+    const source = liveRef.current
+    if (!map || !source) return
+    const projection = map.getView().getProjection().getCode()
+    source.clear()
+    for (const marker of live) {
+      const feature = new Feature(new Point(transform(marker.coordinate, "EPSG:4326", projection)))
+      feature.set("name", marker.name)
+      feature.set("faded", marker.faded)
+      source.addFeature(feature)
+    }
+  }, [live, projectionId])
 
   useLayoutEffect(() => {
     const map = mapRef.current

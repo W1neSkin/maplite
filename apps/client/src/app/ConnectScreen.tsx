@@ -20,7 +20,7 @@ export function ConnectScreen({ onConnected }: ConnectProps) {
     setMessage(null)
     try {
       const role = await readSessionRole(nextServer, nextToken)
-      const session: Session = { server: nextServer, token: nextToken, role: role.role, projectId: role.projectId }
+      const session: Session = { server: nextServer, token: nextToken, role: role.role, projectId: role.projectId, kind: role.kind, deviceId: role.deviceId }
       saveSession(session, remember)
       onConnected(session)
     } catch (error) {
@@ -64,7 +64,7 @@ export function ConnectScreen({ onConnected }: ConnectProps) {
             .then(async (response) => {
               if (!response.ok) throw new Error("server")
               const body = (await response.json()) as { editorToken: string; projectId: string }
-              const session: Session = { server: server.trim(), token: body.editorToken, role: "project", projectId: body.projectId }
+              const session: Session = { server: server.trim(), token: body.editorToken, role: "project", projectId: body.projectId, kind: "editor", deviceId: null }
               saveSession(session, remember)
               onConnected(session)
             })

@@ -4,7 +4,7 @@ import { hashSecret, secretsMatch } from "./tokens.js"
 
 export type Access =
   | { role: "admin" }
-  | { role: "project"; projectId: string; kind: string }
+  | { role: "project"; projectId: string; kind: string; deviceId: string | null }
 
 export function readBearer(header: string | undefined): string | null {
   if (!header) return null
@@ -22,12 +22,12 @@ export function accessFor(db: AppDatabase, config: ServerConfig, authorization: 
   if (config.adminToken && secretsMatch(token, config.adminToken)) return { role: "admin" }
   const row = db
     .prepare(
-      `SELECT project_id, kind FROM project_tokens
+      `SELECT project_id, kind, device_id FROM project_tokens
        WHERE hash = ? AND revoked_at IS NULL`,
     )
-    .get(hashSecret(token)) as { project_id: string; kind: string } | undefined
+    .get(hashSecret(token)) as { project_id: string; kind: string; device_id: string | null } | undefined
   if (!row) return null
-  return { role: "project", projectId: row.project_id, kind: row.kind }
+  return { role: "project", projectId: row.project_id, kind: row.kind, deviceId: row.device_id }
 }
 
 const READ_KINDS = new Set(["editor", "read", "device"])

@@ -17,12 +17,12 @@ export async function readPlace(session: Session, longitude: number, latitude: n
   return typeof body.label === "string" ? body.label : ""
 }
 
-export async function readSessionRole(server: string, token: string): Promise<{ role: "admin" | "project"; projectId: string | null }> {
+export async function readSessionRole(server: string, token: string): Promise<{ role: "admin" | "project"; projectId: string | null; kind: string | null; deviceId: string | null }> {
   const response = await fetch(`${server}/api/v1/session`, { headers: { Authorization: `Bearer ${token}` } })
   if (response.status === 401) throw new Error("auth")
   if (!response.ok) throw new Error("server")
-  const body = (await response.json()) as { role: "admin" | "project"; projectId?: string }
-  return { role: body.role, projectId: body.projectId ?? null }
+  const body = (await response.json()) as { role: "admin" | "project"; projectId?: string; kind?: string | null; deviceId?: string | null }
+  return { role: body.role, projectId: body.projectId ?? null, kind: body.kind ?? null, deviceId: body.deviceId ?? null }
 }
 
 export async function readAll(session: Session): Promise<{ entities: SnapshotEntity[]; watermark: number; schemaVersion: number }> {
@@ -70,7 +70,7 @@ export async function readChanges(session: Session, after: number): Promise<Chan
   return (await response.json()) as ChangesResponse
 }
 
-export async function watchChanges(session: Session, signal: AbortSignal, onChange: () => void): Promise<void> {
+export async function watchChanges(session: Session, signal: AbortSignal, onEvent: (event: "changes-available" | "positions-available") => void): Promise<void> {
   if (!session.projectId) return
   while (!signal.aborted) {
     try {
@@ -88,7 +88,11 @@ export async function watchChanges(session: Session, signal: AbortSignal, onChan
         buffer += decoder.decode(chunk.value, { stream: true })
         const parts = buffer.split("\n\n")
         buffer = parts.pop() ?? ""
-        if (parts.some((part) => part.includes("changes-available"))) onChange()
+        for (const part of parts) {
+          const line = part.split("\n").find((item) => item.startsWith("event:"))
+          const name = line?.slice("event:".length).trim()
+          if (name === "changes-available" || name === "positions-available") onEvent(name)
+        }
       }
     } catch {
       if (signal.aborted) return

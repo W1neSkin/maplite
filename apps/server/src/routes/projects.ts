@@ -38,7 +38,7 @@ export function projectRoutes(db: AppDatabase, config: ServerConfig): Hono<AppEn
     const access = accessFor(db, config, c.req.header("authorization"))
     if (!access) return invalidToken(c)
     if (access.role === "admin") return c.json({ role: "admin" })
-    return c.json({ role: "project", projectId: access.projectId, kind: access.kind })
+    return c.json({ role: "project", projectId: access.projectId, kind: access.kind, deviceId: access.deviceId })
   })
 
   routes.post("/api/v1/projects/:projectId/duplicate", (c) => {

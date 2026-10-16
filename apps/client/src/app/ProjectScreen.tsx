@@ -10,11 +10,13 @@ import { featureBounds } from "../map/bounds.js"
 import { groundOf, seatGeometry } from "../map/seat.js"
 import { paddingFromOverlays, type ScreenBox } from "../map/frame.js"
 import { copyOperation, overwriteOperation } from "../sync/edits.js"
+import { showsLayer } from "./audience.js"
 import { ConflictCard } from "./cards.js"
+import { editOrigin, type Session } from "./connection.js"
 import { ControlPanel } from "./control-panel.js"
+import { DevicesPanel } from "./devices-panel.js"
 import { collectFixes } from "./field.js"
 import { Legend } from "./legend.js"
-import { type Session } from "./connection.js"
 import { CoordBar } from "./coords.js"
 import { MapDock, MeasureBar, PlacingBar, SyncActions } from "./dock.js"
 import { ImportBody } from "./import-sheet.js"
@@ -26,7 +28,9 @@ import { t } from "../i18n/translate.js"
 import { labelFields, LayerStyle } from "./layer-style.js"
 import { LayerActions, LayerBrowser } from "./layers.js"
 import { groupedIds } from "./order.js"
+import { SendPanel } from "./send-panel.js"
 import { Sheet } from "./Sheet.js"
+import { useLive } from "./use-live.js"
 import { useProject } from "./use-project.js"
 import { readHidden, writeHidden } from "./view-state.js"
 
@@ -51,8 +55,10 @@ function nameOf(payload: unknown): string {
   return typeof name === "string" ? name : ""
 }
 
-export function ProjectScreen({ session, onDisconnect, onBack }: { session: Session; onDisconnect: () => void; onBack: (() => void) | null }) {
+export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { session: Session; onDisconnect: () => void; onBack: (() => void) | null; onJoined: (session: Session) => void }) {
   const project = useProject(session)
+  const live = useLive(session)
+  const surface = editOrigin().surface
   const mapRef = useRef<MapHandle>(null)
   const stageRef = useRef<HTMLDivElement>(null)
   const sheetRef = useRef<HTMLElement>(null)
@@ -71,6 +77,8 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
   const [measuring, setMeasuring] = useState(false)
   const [ruler, setRuler] = useState<[number, number][]>([])
   const [controlsOpen, setControlsOpen] = useState(false)
+  const [devicesOpen, setDevicesOpen] = useState(false)
+  const [sendLayerId, setSendLayerId] = useState<string | null>(null)
   const [controlPick, setControlPick] = useState(false)
   const [controlDraft, setControlDraft] = useState<[number, number] | null>(null)
   const [fieldBusy, setFieldBusy] = useState(false)
@@ -85,7 +93,9 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
   const fileRef = useRef<HTMLInputElement>(null)
   const zipRef = useRef<Uint8Array | null>(null)
   const status = project.upgrade ? t("upgradeRequired") : project.failed ? t("serverUnavailable") : basemapFailed ? t("basemapUnavailable") : locationOff ? t("locationOff") : null
-  const openLayer = openLayerId ? project.model.layers.find((layer) => layer.id === openLayerId) ?? null : null
+  const shownLayers = project.model.layers.filter((layer) => showsLayer(layer.delivery, surface, session.deviceId))
+  const shownIds = new Set(shownLayers.map((layer) => layer.id))
+  const openLayer = openLayerId ? shownLayers.find((layer) => layer.id === openLayerId) ?? null : null
   useEffect(() => setStyleOpen(false), [openLayerId])
   const placingLayer = placingLayerId ? project.model.layers.find((layer) => layer.id === placingLayerId) ?? null : null
 
@@ -233,7 +243,7 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
   function fitShown() {
     const features = openLayer
       ? project.model.features.filter((feature) => feature.layerId === openLayer.id)
-      : project.model.features.filter((feature) => !hidden.has(feature.layerId))
+      : project.model.features.filter((feature) => shownIds.has(feature.layerId) && !hidden.has(feature.layerId))
     const box = featureBounds(features)
     if (box) mapRef.current?.fitBox(box)
   }
@@ -330,10 +340,12 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
 
   return (
     <div ref={stageRef} className="relative h-full">
-      <Legend layers={project.model.layers} hidden={hidden} />
+      <Legend layers={shownLayers} hidden={hidden} />
+      {live.sharing ? <p role="status" className="absolute left-1/2 top-[max(8px,env(safe-area-inset-top))] z-20 -translate-x-1/2 rounded-full bg-neutral-900 px-3 py-1 text-xs text-white">{t("sharingLive")}</p> : null}
       <MapView
         ref={mapRef}
-        features={project.model.features.filter((feature) => !hidden.has(feature.layerId))}
+        features={project.model.features.filter((feature) => shownIds.has(feature.layerId) && !hidden.has(feature.layerId))}
+        live={live.markers}
         selectedId={selectedId}
         placing={placingLayerId !== null || measuring || controlPick}
         callout={callout}
@@ -359,7 +371,12 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
         onCursor={setCursor}
         onLocated={setCursor}
         onSelect={(id) => { if (id) selectFeature(id); else setSelectedId(null) }}
-        onGeometry={(id, geometry) => project.updateGeometry(id, geometry)}
+        onGeometry={(id, geometry) => {
+          const feature = project.model.features.find((item) => item.id === id)
+          const layer = project.model.layers.find((item) => item.id === feature?.layerId)
+          if (layer?.delivery) return
+          project.updateGeometry(id, geometry)
+        }}
       />
       {measuring ? (
         <MeasureBar label={rulerLabel} canUndo={ruler.length > 0} onUndo={() => setRuler((current) => current.slice(0, -1))} onClose={stopMeasure} />
@@ -372,7 +389,7 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
             setPlaceName(name)
           }}
           layerId={placingLayer.id}
-          layers={project.model.layers.filter((layer) => layer.geometryType === placingLayer.geometryType)}
+          layers={shownLayers.filter((layer) => layer.geometryType === placingLayer.geometryType && !layer.delivery)}
           onLayer={choosePlaceLayer}
           onClose={() => { setPlacingLayerId(null); setVertices([]) }}
           sketch={placingLayer.geometryType !== "Point"}
@@ -389,16 +406,18 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
       {sheet && !placingLayerId ? (
         <Sheet
           ref={sheetRef}
-          title={outcome ? t("importData") : controlsOpen ? t("controlPoints") : openLayer ? openLayer.name : t("layersTitle")}
-          onClose={() => { if (outcome) { setOutcome(null); return }; if (openLayerId) setOpenLayerId(null); else setSheet(false) }}
-          onRename={!outcome && openLayer ? (name) => void project.renameLayer(openLayer.id, name) : undefined}
-          actions={!outcome && openLayer ? (
+          title={outcome ? t("importData") : devicesOpen ? t("devices") : sendLayerId ? t("sendLayer") : controlsOpen ? t("controlPoints") : openLayer ? openLayer.name : t("layersTitle")}
+          onClose={() => { if (outcome) { setOutcome(null); return }; if (devicesOpen) { setDevicesOpen(false); return }; if (sendLayerId) { setSendLayerId(null); return }; if (openLayerId) setOpenLayerId(null); else setSheet(false) }}
+          onRename={!outcome && !devicesOpen && !sendLayerId && openLayer && !openLayer.delivery ? (name) => void project.renameLayer(openLayer.id, name) : undefined}
+          actions={!outcome && !devicesOpen && !sendLayerId && openLayer ? (
             <LayerActions
               geometryType={openLayer.geometryType}
               color={openLayer.color}
               styleOpen={styleOpen}
+              locked={openLayer.delivery != null}
               onStyle={() => setStyleOpen((open) => !open)}
               onAdd={beginAdd}
+              onSend={surface === "main" && !openLayer.delivery ? () => { setSendLayerId(openLayer.id); setDevicesOpen(false); setControlsOpen(false) } : undefined}
               onExport={() => {
                 const file = layerZip(openLayer.name, openLayer.geometryType, project.recordsIn(openLayer.id))
                 void saveZip(file.filename, file.bytes)
@@ -408,7 +427,23 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
           ) : null}
           footer={<SyncActions lastSync={project.lastSync} onSync={syncNow} onFit={fitShown} fitLabel={t(openLayer ? "fitLayer" : "fitLayers")} canUndo={project.canUndo} canRedo={project.canRedo} onUndo={project.undo} onRedo={project.redo} onBack={onBack} onDisconnect={onDisconnect} />}
         >
-          {controlsOpen && !outcome ? (
+          {devicesOpen && !outcome ? (
+            <DevicesPanel
+              session={session}
+              surface={surface}
+              sharing={live.sharing}
+              onSharing={live.setSharing}
+              people={live.people}
+              onTogglePerson={live.togglePerson}
+              onJoined={onJoined}
+            />
+          ) : sendLayerId && !outcome ? (
+            <SendPanel session={session} onSend={async (audience) => {
+              const ok = await project.sendLayer(sendLayerId, audience)
+              if (ok) setSendLayerId(null)
+              return ok
+            }} />
+          ) : controlsOpen && !outcome ? (
             <ControlPanel
               points={project.controlPoints}
               rms={controlFit?.rms ?? null}
@@ -463,9 +498,9 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
             />
           ) : null}
           <LayerBrowser
-            layers={project.model.layers}
+            layers={shownLayers}
             groups={project.model.groups}
-            features={project.model.features}
+            features={project.model.features.filter((feature) => shownIds.has(feature.layerId))}
             openLayerId={openLayerId}
             selectedId={selectedId}
             onOpenLayer={setOpenLayerId}
@@ -483,9 +518,11 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
             onSetGroup={project.setLayerGroup}
             hidden={hidden}
             onToggleVisible={toggleHidden}
-            onReorder={(groupId, from, to) => project.reorderLayers(groupedIds(project.model.layers, project.model.groups, groupId, from, to))}
+            onReorder={(groupId, from, to) => project.reorderLayers(groupedIds(shownLayers, project.model.groups, groupId, from, to))}
             onImport={() => fileRef.current?.click()}
+            onDevices={() => { setDevicesOpen(true); setSendLayerId(null); setControlsOpen(false); setOpenLayerId(null) }}
             onControls={() => setControlsOpen(true)}
+            locked={openLayer?.delivery != null}
             fieldBusy={fieldBusy}
             onMark={() => void markHere()}
             onAverage={() => void averageHere()}

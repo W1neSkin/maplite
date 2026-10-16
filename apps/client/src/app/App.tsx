@@ -18,7 +18,7 @@ export function App() {
           setSession(null)
         }}
         onOpen={(projectId, token) => {
-          const next = { ...session, token, role: "project" as const, projectId }
+          const next = { ...session, token, role: "project" as const, projectId, kind: "editor", deviceId: null }
           setFromAdmin(true)
           setSession(next)
         }}
@@ -33,10 +33,11 @@ export function App() {
         setFromAdmin(false)
         setSession(null)
       }}
+      onJoined={setSession}
       onBack={
         fromAdmin
           ? () => {
-              const next = { ...session, role: "admin" as const, projectId: null }
+              const next = { ...session, role: "admin" as const, projectId: null, kind: null, deviceId: null }
               saveSession(next, false)
               setFromAdmin(false)
               setSession(next)

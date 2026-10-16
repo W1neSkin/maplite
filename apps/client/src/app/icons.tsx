@@ -156,6 +156,24 @@ export function FitIcon() {
   )
 }
 
+export function SendIcon() {
+  return (
+    <Glyph>
+      <path d="M4 12h12" />
+      <path d="m12 6 6 6-6 6" />
+    </Glyph>
+  )
+}
+
+export function DevicesIcon() {
+  return (
+    <Glyph>
+      <rect x="7" y="3" width="10" height="18" rx="2" />
+      <path d="M11 18h2" />
+    </Glyph>
+  )
+}
+
 export function ExportIcon() {
   return (
     <Glyph>

@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { t } from "../i18n/translate.js"
 import { measureLabel } from "./measure-label.js"
 import type { MapFeature, MapLayer } from "./model.js"
-import { CheckIcon, CloseIcon, ExportIcon, EyeIcon, EyeOffIcon, GeometryGlyph, GripIcon, IconButton, ImportIcon, PencilIcon, PinIcon, PlusIcon, TrashIcon } from "./icons.js"
+import { CheckIcon, CloseIcon, DevicesIcon, ExportIcon, EyeIcon, EyeOffIcon, GeometryGlyph, GripIcon, IconButton, ImportIcon, PencilIcon, PinIcon, PlusIcon, SendIcon, TrashIcon } from "./icons.js"
 import type { MapGroup } from "./model.js"
 import { FieldTools } from "./field-tools.js"
 
@@ -23,7 +23,9 @@ type LayerBrowserProps = {
   onToggleVisible: (id: string) => void
   onReorder: (groupId: string | null, from: number, to: number) => void
   onImport: () => void
+  onDevices: () => void
   onControls: () => void
+  locked: boolean
   fieldBusy: boolean
   onMark: () => void
   onAverage: () => void
@@ -89,6 +91,9 @@ export function LayerBrowser(props: LayerBrowserProps) {
           <IconButton tone="fill" aria-label={t("importData")} title={t("importData")} onClick={props.onImport}>
             <ImportIcon />
           </IconButton>
+          <IconButton tone="fill" aria-label={t("devices")} title={t("devices")} onClick={props.onDevices}>
+            <DevicesIcon />
+          </IconButton>
           <IconButton tone="fill" aria-label={t("controlPoints")} title={t("controlPoints")} onClick={props.onControls}>
             <PlusIcon />
           </IconButton>
@@ -107,7 +112,7 @@ export function LayerBrowser(props: LayerBrowserProps) {
   return (
     <div className="flex flex-col gap-1">
       <input aria-label={t("searchFeatures")} className="h-8 rounded-lg border border-[var(--border)] px-2 text-sm" value={query} onChange={(event) => setQuery(event.target.value)} />
-      {layer.geometryType === "Point" ? <FieldTools busy={props.fieldBusy} onMark={props.onMark} onAverage={props.onAverage} onLine={props.onBuildLine} onPolygon={props.onBuildPolygon} /> : null}
+      {layer.geometryType === "Point" && !props.locked ? <FieldTools busy={props.fieldBusy} onMark={props.onMark} onAverage={props.onAverage} onLine={props.onBuildLine} onPolygon={props.onBuildPolygon} /> : null}
     <ul className="flex flex-col">
       {features.map((feature) => (
         <FeatureRow
@@ -115,6 +120,7 @@ export function LayerBrowser(props: LayerBrowserProps) {
           feature={feature}
           selected={feature.id === props.selectedId}
           onSelect={() => props.onSelectFeature(feature.id)}
+          locked={props.locked}
           onRename={(name) => props.onRenameFeature(feature.id, name)}
           onDelete={() => props.onDeleteFeature(feature.id)}
         />
@@ -137,7 +143,7 @@ function revealInSheet(row: HTMLElement) {
   else if (below > 0) scroller.scrollTop += below
 }
 
-function FeatureRow(props: { feature: MapFeature; selected: boolean; onSelect: () => void; onRename: (name: string) => void; onDelete: () => void }) {
+function FeatureRow(props: { feature: MapFeature; selected: boolean; locked: boolean; onSelect: () => void; onRename: (name: string) => void; onDelete: () => void }) {
   const rowRef = useRef<HTMLLIElement>(null)
   const [editing, setEditing] = useState(false)
   const [name, setName] = useState(props.feature.name)
@@ -149,7 +155,7 @@ function FeatureRow(props: { feature: MapFeature; selected: boolean; onSelect: (
     const row = rowRef.current
     if (props.selected && row) revealInSheet(row)
   }, [props.selected, editing])
-  if (props.selected && editing) {
+  if (props.selected && editing && !props.locked) {
     return (
       <li ref={rowRef}>
         <form
@@ -194,7 +200,7 @@ function FeatureRow(props: { feature: MapFeature; selected: boolean; onSelect: (
           <GeometryGlyph type={props.feature.geometry.type} color={props.feature.color} />
           <span className="truncate">{props.feature.name}</span>
         </button>
-        {props.selected ? (
+        {props.selected && !props.locked ? (
           <>
             <IconButton aria-label={t("rename")} title={t("rename")} onClick={() => setEditing(true)}>
               <PencilIcon />
@@ -281,21 +287,32 @@ function NewLayer(props: { groups: readonly MapGroup[]; onCreate: (name: string,
   )
 }
 
-export function LayerActions(props: { geometryType: MapLayer["geometryType"]; color: string; styleOpen: boolean; onStyle: () => void; onAdd: () => void; onExport: () => void; onDelete: () => void }) {
+export function LayerActions(props: { geometryType: MapLayer["geometryType"]; color: string; styleOpen: boolean; locked: boolean; onStyle: () => void; onAdd: () => void; onSend?: () => void; onExport: () => void; onDelete: () => void }) {
   return (
     <>
-      <IconButton tone="fill" aria-label={t(props.geometryType === "Point" ? "addToLayer" : props.geometryType === "LineString" ? "drawLine" : "drawPolygon")} title={t(props.geometryType === "Point" ? "addToLayer" : props.geometryType === "LineString" ? "drawLine" : "drawPolygon")} onClick={props.onAdd}>
-        {props.geometryType === "Point" ? <PinIcon /> : <GeometryGlyph type={props.geometryType} />}
-      </IconButton>
-      <IconButton tone="fill" aria-label={t("layerColor")} aria-pressed={props.styleOpen} title={t("layerColor")} onClick={props.onStyle}>
-        <span className={props.styleOpen ? "h-4 w-4 rounded-full ring-2 ring-neutral-900" : "h-4 w-4 rounded-full"} style={{ backgroundColor: props.color }} />
-      </IconButton>
+      {props.locked ? null : (
+        <IconButton tone="fill" aria-label={t(props.geometryType === "Point" ? "addToLayer" : props.geometryType === "LineString" ? "drawLine" : "drawPolygon")} title={t(props.geometryType === "Point" ? "addToLayer" : props.geometryType === "LineString" ? "drawLine" : "drawPolygon")} onClick={props.onAdd}>
+          {props.geometryType === "Point" ? <PinIcon /> : <GeometryGlyph type={props.geometryType} />}
+        </IconButton>
+      )}
+      {props.locked ? null : (
+        <IconButton tone="fill" aria-label={t("layerColor")} aria-pressed={props.styleOpen} title={t("layerColor")} onClick={props.onStyle}>
+          <span className={props.styleOpen ? "h-4 w-4 rounded-full ring-2 ring-neutral-900" : "h-4 w-4 rounded-full"} style={{ backgroundColor: props.color }} />
+        </IconButton>
+      )}
+      {props.onSend ? (
+        <IconButton tone="fill" aria-label={t("sendLayer")} title={t("sendLayer")} onClick={props.onSend}>
+          <SendIcon />
+        </IconButton>
+      ) : null}
       <IconButton tone="fill" aria-label={t("exportLayer")} title={t("exportLayer")} onClick={props.onExport}>
         <ExportIcon />
       </IconButton>
-      <IconButton tone="fill" aria-label={t("deleteLayer")} title={t("deleteLayer")} onClick={props.onDelete}>
-        <TrashIcon />
-      </IconButton>
+      {props.locked ? null : (
+        <IconButton tone="fill" aria-label={t("deleteLayer")} title={t("deleteLayer")} onClick={props.onDelete}>
+          <TrashIcon />
+        </IconButton>
+      )}
     </>
   )
 }
