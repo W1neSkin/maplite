@@ -16,6 +16,7 @@ import { loadBytes, type ImportOutcome } from "../import/load.js"
 import { saveZip } from "../import/save-zip.js"
 import { layerZip } from "../import/write-shp.js"
 import { t } from "../i18n/translate.js"
+import { LayerStyle } from "./layer-style.js"
 import { LayerActions, LayerBrowser } from "./layers.js"
 import { moveItem } from "./order.js"
 import { Sheet } from "./Sheet.js"
@@ -305,6 +306,16 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
               }}
             />
           ) : (
+          <>
+          {openLayer ? (
+            <LayerStyle
+              color={openLayer.color}
+              fillOpacity={openLayer.fillOpacity}
+              geometryType={openLayer.geometryType}
+              onColor={(color) => project.restyleLayer(openLayer.id, { color })}
+              onOpacity={(fillOpacity) => project.restyleLayer(openLayer.id, { fillOpacity })}
+            />
+          ) : null}
           <LayerBrowser
             layers={project.model.layers}
             features={project.model.features}
@@ -329,6 +340,7 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
             }}
             onImport={() => fileRef.current?.click()}
           />
+          </>
           )}
         </Sheet>
       ) : null}

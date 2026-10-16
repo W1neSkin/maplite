@@ -85,6 +85,8 @@ describe("map model", () => {
     const model = buildMapModel(snapshot)
     expect(projectName(snapshot)).toBe("Demo")
     expect(model.layers.map((layer) => layer.name)).toEqual(["Points of interest"])
+    expect(model.layers[0]?.color).toBe("#1f4d3a")
+    expect(model.features[0]?.color).toBe("#1f4d3a")
     expect(model.features.map((feature) => feature.name)).toEqual(["North gate"])
   })
 

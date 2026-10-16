@@ -33,7 +33,7 @@ export function LayerBrowser(props: LayerBrowserProps) {
                   {hidden ? <EyeOffIcon /> : <EyeIcon />}
                 </IconButton>
                 <button type="button" className={hidden ? "flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg px-1 text-left text-sm text-neutral-400" : "flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg px-1 text-left text-sm"} onClick={() => props.onOpenLayer(item.id)}>
-                  <GeometryGlyph type={item.geometryType} />
+                  <GeometryGlyph type={item.geometryType} color={hidden ? undefined : item.color} />
                   <span className="min-w-0 flex-1 truncate">{item.name}</span>
                   <span className="text-xs tabular-nums text-neutral-500">{item.count}</span>
                 </button>
@@ -116,7 +116,7 @@ function FeatureRow(props: { feature: MapFeature; selected: boolean; onSelect: (
             setEditing(false)
           }}
         >
-          <GeometryGlyph type={props.feature.geometry.type} />
+          <GeometryGlyph type={props.feature.geometry.type} color={props.feature.color} />
           <input
             aria-label={t("featureName")}
             className="h-8 min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-white px-2 text-sm"
@@ -144,7 +144,7 @@ function FeatureRow(props: { feature: MapFeature; selected: boolean; onSelect: (
   return (
     <li ref={rowRef} className={props.selected ? "flex items-center rounded-lg bg-[var(--primary)]/10" : "flex items-center"}>
       <button type="button" className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg px-1 text-left text-sm" onClick={props.onSelect}>
-        <GeometryGlyph type={props.feature.geometry.type} />
+        <GeometryGlyph type={props.feature.geometry.type} color={props.feature.color} />
         <span className="truncate">{props.feature.name}</span>
       </button>
       {props.selected ? (

@@ -195,23 +195,25 @@ export function DisconnectIcon() {
 
 type GeometryKind = "Point" | "LineString" | "Polygon"
 
-export function GeometryGlyph(props: { type: GeometryKind }) {
+export function GeometryGlyph(props: { type: GeometryKind; color?: string }) {
+  const paint = props.color ? "shrink-0" : "shrink-0 text-neutral-500"
+  const ink = props.color ? { color: props.color } : undefined
   if (props.type === "Point") {
     return (
-      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" className="shrink-0 text-neutral-500">
+      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" className={paint} style={ink}>
         <circle cx="8" cy="8" r="3.2" fill="currentColor" />
       </svg>
     )
   }
   if (props.type === "LineString") {
     return (
-      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" className="shrink-0 text-neutral-500">
+      <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" className={paint} style={ink}>
         <path d="M2 12 6 6l4 4 4-7" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
       </svg>
     )
   }
   return (
-    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" className="shrink-0 text-neutral-500">
+    <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true" className={paint} style={ink}>
       <path d="M4 5.5 12 4l1.2 7.2L5 13Z" fill="currentColor" fillOpacity="0.18" stroke="currentColor" strokeWidth="1.4" strokeLinejoin="round" />
     </svg>
   )

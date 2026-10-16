@@ -4,6 +4,8 @@ export type MapLayer = {
   id: string
   name: string
   geometryType: Layer["geometryType"]
+  color: string
+  fillOpacity: number
   count: number
 }
 
@@ -57,6 +59,8 @@ export function buildMapModel(snapshot: SnapshotResponse): MapModel {
         id: layer.id,
         name: layer.name,
         geometryType: layer.geometryType,
+        color: layer.style.color,
+        fillOpacity: layer.style.fillOpacity,
         count: features.filter((feature) => feature.layerId === layer.id).length,
       })),
     features,
