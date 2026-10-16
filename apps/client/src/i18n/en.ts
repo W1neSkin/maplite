@@ -77,7 +77,7 @@ export const messages = {
   chooseLayer: "Choose a layer",
   deleteLayer: "Delete layer",
   addToLayer: "Add a point here",
-  newLayer: "New point layer",
+  newLayer: "New layer",
   createLayer: "Create",
   deleteFeature: "Delete",
   featureName: "Name",

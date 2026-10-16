@@ -166,6 +166,7 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
     if (layer.geometryType === "LineString" && vertices.length < 2) return
     if (layer.geometryType === "Polygon" && vertices.length < 3) return
     const name = placeName.trim() || suggestedName(layer.id)
+    // A polygon ring must repeat its first vertex. The sketch itself stays open until this moment.
     const geometry = layer.geometryType === "LineString"
       ? { type: "LineString" as const, coordinates: vertices }
       : { type: "Polygon" as const, coordinates: [[...vertices, vertices[0]!]] }
@@ -316,7 +317,8 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
             onCreateLayer={(name, geometryType) => void project.createPointLayer(name, geometryType).then((id) => {
               if (!id) return
               placeNameTouched.current = false
-              setPlaceName(t("defaultPointName", { n: 1 }))
+              const key = geometryType === "LineString" ? "defaultLineName" : geometryType === "Polygon" ? "defaultPolygonName" : "defaultPointName"
+              setPlaceName(t(key, { n: 1 }))
               startPlacing(id)
             })}
             hidden={hidden}
