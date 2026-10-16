@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { t } from "../i18n/translate.js"
 import { measureLabel } from "./measure-label.js"
 import type { MapFeature, MapLayer } from "./model.js"
-import { CheckIcon, CloseIcon, DevicesIcon, ExportIcon, EyeIcon, EyeOffIcon, GeometryGlyph, GripIcon, IconButton, ImportIcon, PencilIcon, PinIcon, PlusIcon, SendIcon, TrashIcon } from "./icons.js"
+import { CheckIcon, CloseIcon, ExportIcon, EyeIcon, EyeOffIcon, GeometryGlyph, GripIcon, IconButton, ImportIcon, PencilIcon, PinIcon, PlusIcon, SendIcon, TrashIcon } from "./icons.js"
 import type { MapGroup } from "./model.js"
 import { FieldTools } from "./field-tools.js"
 
@@ -23,7 +23,6 @@ type LayerBrowserProps = {
   onToggleVisible: (id: string) => void
   onReorder: (groupId: string | null, from: number, to: number) => void
   onImport: () => void
-  onDevices: () => void
   onControls: () => void
   locked: boolean
   fieldBusy: boolean
@@ -90,9 +89,6 @@ export function LayerBrowser(props: LayerBrowserProps) {
         <div className="flex gap-1">
           <IconButton tone="fill" aria-label={t("importData")} title={t("importData")} onClick={props.onImport}>
             <ImportIcon />
-          </IconButton>
-          <IconButton tone="fill" aria-label={t("devices")} title={t("devices")} onClick={props.onDevices}>
-            <DevicesIcon />
           </IconButton>
           <IconButton tone="fill" aria-label={t("controlPoints")} title={t("controlPoints")} onClick={props.onControls}>
             <PlusIcon />

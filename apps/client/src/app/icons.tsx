@@ -156,11 +156,28 @@ export function FitIcon() {
   )
 }
 
+/** Paper plane. A bare arrow read as "next", not as sending the layer. */
 export function SendIcon() {
   return (
     <Glyph>
-      <path d="M4 12h12" />
-      <path d="m12 6 6 6-6 6" />
+      <path d="m22 2-7 20-4-9-9-4Z" />
+      <path d="M22 2 11 13" />
+    </Glyph>
+  )
+}
+
+export function SettingsIcon() {
+  return (
+    <Glyph>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 2v3" />
+      <path d="M12 19v3" />
+      <path d="M2 12h3" />
+      <path d="M19 12h3" />
+      <path d="m4.9 4.9 2.2 2.2" />
+      <path d="m16.9 16.9 2.2 2.2" />
+      <path d="m19.1 4.9-2.2 2.2" />
+      <path d="m7.1 16.9-2.2 2.2" />
     </Glyph>
   )
 }

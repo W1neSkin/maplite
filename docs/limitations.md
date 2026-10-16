@@ -12,7 +12,7 @@
 ## This slice
 
 - The browser asks for a server address and a token. `Use the local demo` calls a localhost-only route that is off when `NODE_ENV=production`.
-- The phone outbox is tested against a SQLite file. Android and iOS projects are not generated yet, so those CI scripts fail on purpose.
+- Pending phone edits are kept in the WebView store, not in a native SQLite file. They survive a force-stop. A browser edit is not queued.
 - The public OpenStreetMap tile servers are used by the browser demo. The caching tile proxy is not built yet.
 - Request bodies are checked in code. A JSON Schema validator is not wired through every route yet.
 - The Docker process runs as root so the data volume is writable.

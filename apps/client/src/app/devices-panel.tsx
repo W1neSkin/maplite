@@ -33,6 +33,12 @@ export function DevicesPanel(props: {
 
   return (
     <div className="flex flex-col gap-2">
+      {props.surface === "device" ? (
+        <label className="flex items-center gap-2 text-sm">
+          <input type="checkbox" checked={props.sharing} onChange={(event) => props.onSharing(event.target.checked)} />
+          {t("shareLive")}
+        </label>
+      ) : null}
       {props.surface === "main" ? (
         <>
           <div className="flex items-center gap-1">
@@ -94,12 +100,6 @@ export function DevicesPanel(props: {
           </div>
           {joinFailed ? <p className="text-xs text-neutral-500">{t("joinFailed")}</p> : null}
         </form>
-      ) : null}
-      {props.surface === "device" ? (
-        <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={props.sharing} onChange={(event) => props.onSharing(event.target.checked)} />
-          {t("shareLive")}
-        </label>
       ) : null}
       {props.people.length > 0 ? <div className="px-1 text-[11px] uppercase tracking-wide text-neutral-400">{t("liveTitle")}</div> : null}
       <ul className="flex flex-col">

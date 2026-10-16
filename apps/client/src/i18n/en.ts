@@ -132,6 +132,7 @@ export const messages = {
   conflictCount: "{count} conflicts",
   notSyncedYet: "Not synced yet",
   devices: "Devices",
+  settings: "Settings",
   sendLayer: "Send layer",
   sendHelp: "Sends the layer as it is now. Send again to replace it.",
   allDevices: "All",

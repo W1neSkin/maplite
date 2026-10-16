@@ -44,10 +44,15 @@ export function clientId(): string {
 }
 
 /** The phone app runs inside Capacitor. The browser on the computer is the main window. */
-export function editOrigin(): EditOrigin {
+export function isPhoneApp(): boolean {
   const capacitor = (globalThis as { Capacitor?: { isNativePlatform?: () => boolean } }).Capacitor
-  const native = capacitor?.isNativePlatform?.() === true
-  return { surface: native ? "device" : "main", deviceId: clientId() }
+  if (capacitor?.isNativePlatform?.() === true) return true
+  // Android WebView adds "; wv)". A desktop browser does not.
+  return typeof navigator !== "undefined" && /; wv\)/.test(navigator.userAgent)
+}
+
+export function editOrigin(): EditOrigin {
+  return { surface: isPhoneApp() ? "device" : "main", deviceId: clientId() }
 }
 
 export function readSession(): Session | null {

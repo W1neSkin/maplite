@@ -7,7 +7,7 @@ export function Legend(props: { layers: readonly MapLayer[]; hidden: ReadonlySet
   const [open, setOpen] = useState(false)
   const shown = props.layers.filter((layer) => !props.hidden.has(layer.id))
   return (
-    <div className="absolute right-[max(8px,env(safe-area-inset-right))] top-[calc(max(8px,env(safe-area-inset-top))+116px)] z-20 flex flex-col items-end gap-1">
+    <div className="map-legend absolute right-[max(8px,env(safe-area-inset-right))] top-[calc(max(8px,env(safe-area-inset-top))+116px)] z-20 flex flex-col items-end gap-1">
       <IconButton tone="dock" aria-label={t("legend")} aria-pressed={open} title={t("legend")} onClick={() => setOpen((current) => !current)}>
         <span className="h-3 w-3 rounded-sm bg-neutral-800" />
       </IconButton>

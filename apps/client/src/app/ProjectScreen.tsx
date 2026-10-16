@@ -92,7 +92,7 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const zipRef = useRef<Uint8Array | null>(null)
-  const status = project.upgrade ? t("upgradeRequired") : project.failed ? t("serverUnavailable") : basemapFailed ? t("basemapUnavailable") : locationOff ? t("locationOff") : null
+  const status = project.upgrade ? t("upgradeRequired") : project.pending > 0 ? t("pendingChanges", { count: project.pending }) : project.failed ? t("serverUnavailable") : basemapFailed ? t("basemapUnavailable") : locationOff ? t("locationOff") : null
   const shownLayers = project.model.layers.filter((layer) => showsLayer(layer.delivery, surface, session.deviceId))
   const shownIds = new Set(shownLayers.map((layer) => layer.id))
   const openLayer = openLayerId ? shownLayers.find((layer) => layer.id === openLayerId) ?? null : null
@@ -249,7 +249,8 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
   }
 
   function syncNow() {
-    void project.pull().catch(() => project.setFailed(true))
+    if (project.pending > 0) void project.flush()
+    else void project.pull().catch(() => project.setFailed(true))
   }
 
   function toggleHidden(id: string) {
@@ -339,7 +340,7 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
     : null
 
   return (
-    <div ref={stageRef} className="relative h-full">
+    <div ref={stageRef} className={surface === "device" ? "map-phone relative h-full" : "relative h-full"}>
       <Legend layers={shownLayers} hidden={hidden} />
       {live.sharing ? <p role="status" className="absolute left-1/2 top-[max(8px,env(safe-area-inset-top))] z-20 -translate-x-1/2 rounded-full bg-neutral-900 px-3 py-1 text-xs text-white">{t("sharingLive")}</p> : null}
       <MapView
@@ -406,7 +407,7 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
       {sheet && !placingLayerId ? (
         <Sheet
           ref={sheetRef}
-          title={outcome ? t("importData") : devicesOpen ? t("devices") : sendLayerId ? t("sendLayer") : controlsOpen ? t("controlPoints") : openLayer ? openLayer.name : t("layersTitle")}
+          title={outcome ? t("importData") : devicesOpen ? t("settings") : sendLayerId ? t("sendLayer") : controlsOpen ? t("controlPoints") : openLayer ? openLayer.name : t("layersTitle")}
           onClose={() => { if (outcome) { setOutcome(null); return }; if (devicesOpen) { setDevicesOpen(false); return }; if (sendLayerId) { setSendLayerId(null); return }; if (openLayerId) setOpenLayerId(null); else setSheet(false) }}
           onRename={!outcome && !devicesOpen && !sendLayerId && openLayer && !openLayer.delivery ? (name) => void project.renameLayer(openLayer.id, name) : undefined}
           actions={!outcome && !devicesOpen && !sendLayerId && openLayer ? (
@@ -520,7 +521,6 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
             onToggleVisible={toggleHidden}
             onReorder={(groupId, from, to) => project.reorderLayers(groupedIds(shownLayers, project.model.groups, groupId, from, to))}
             onImport={() => fileRef.current?.click()}
-            onDevices={() => { setDevicesOpen(true); setSendLayerId(null); setControlsOpen(false); setOpenLayerId(null) }}
             onControls={() => setControlsOpen(true)}
             locked={openLayer?.delivery != null}
             fieldBusy={fieldBusy}
@@ -579,15 +579,35 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
       />
       <MapDock
         dockRef={dockRef}
-        layersOpen={sheet && !placingLayerId}
+        layersOpen={sheet && !placingLayerId && !devicesOpen}
         placing={placingLayerId !== null}
         measuring={measuring}
         locating={locating}
-        disabled={project.failed || project.loading}
-        onLayers={() => { setPlacingLayerId(null); stopMeasure(); setSheet((current) => !current) }}
+        settingsOpen={devicesOpen}
+        disabled={project.loading || (surface !== "device" && project.failed)}
+        onLayers={() => {
+          setPlacingLayerId(null)
+          stopMeasure()
+          if (devicesOpen) {
+            setDevicesOpen(false)
+            setSheet(true)
+            return
+          }
+          setSheet((current) => !current)
+        }}
         onAdd={beginAdd}
         onMeasure={toggleMeasure}
         onLocate={() => void locate()}
+        onSettings={() => {
+          setPlacingLayerId(null)
+          stopMeasure()
+          setSendLayerId(null)
+          setControlsOpen(false)
+          setOpenLayerId(null)
+          setOutcome(null)
+          setDevicesOpen(true)
+          setSheet(true)
+        }}
       />
     </div>
   )

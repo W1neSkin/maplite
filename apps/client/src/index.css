@@ -81,6 +81,19 @@ body {
   place-items: center;
 }
 
+/* Pinch replaces the zoom buttons. North and the legend move up into the gap. */
+.map-phone .ol-zoom {
+  display: none;
+}
+
+.map-phone .map-north {
+  top: max(8px, env(safe-area-inset-top));
+}
+
+.map-phone .map-legend {
+  top: calc(max(8px, env(safe-area-inset-top)) + 40px);
+}
+
 .ol-attribution {
   font-size: 11px;
   max-width: 46%;

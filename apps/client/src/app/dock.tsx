@@ -1,7 +1,7 @@
 import { useState, type Ref } from "react"
 import { formatWhen } from "../i18n/format.js"
 import { t } from "../i18n/translate.js"
-import { BackIcon, CheckIcon, CloseIcon, DisconnectIcon, FitIcon, IconButton, LayersIcon, LocateIcon, MeasureIcon, PinIcon, RedoIcon, SyncIcon, UndoIcon } from "./icons.js"
+import { BackIcon, CheckIcon, CloseIcon, DisconnectIcon, FitIcon, IconButton, LayersIcon, LocateIcon, MeasureIcon, PinIcon, RedoIcon, SettingsIcon, SyncIcon, UndoIcon } from "./icons.js"
 
 export function MapDock(props: {
   dockRef: Ref<HTMLElement>
@@ -10,10 +10,12 @@ export function MapDock(props: {
   measuring: boolean
   disabled: boolean
   locating: boolean
+  settingsOpen: boolean
   onLayers: () => void
   onAdd: () => void
   onMeasure: () => void
   onLocate: () => void
+  onSettings: () => void
 }) {
   return (
     <nav ref={props.dockRef} className="absolute bottom-[max(8px,env(safe-area-inset-bottom))] left-1/2 z-30 flex -translate-x-1/2 gap-2">
@@ -28,6 +30,9 @@ export function MapDock(props: {
       </IconButton>
       <IconButton tone={props.locating ? "dockOn" : "dock"} aria-pressed={props.locating} aria-label={t("myLocation")} title={t("myLocation")} onClick={props.onLocate}>
         <LocateIcon />
+      </IconButton>
+      <IconButton tone={props.settingsOpen ? "dockOn" : "dock"} aria-pressed={props.settingsOpen} aria-label={t("settings")} title={t("settings")} onClick={props.onSettings}>
+        <SettingsIcon />
       </IconButton>
     </nav>
   )

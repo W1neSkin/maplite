@@ -1,8 +1,9 @@
 import { createId, type ControlPoint, type Feature, type JsonValue, type Layer, type LayerGroup, type SnapshotEntity, type SyncOperation } from "@cartography/project-schema"
 import type { ImportReady } from "../import/load.js"
 import { useCallback, useEffect, useRef, useState } from "react"
-import { clientId, editOrigin, type Session } from "./connection.js"
+import { clientId, editOrigin, isPhoneApp, type Session } from "./connection.js"
 import { buildMapModel, type MapModel } from "./model.js"
+import { applyLocal, forgetOps, readPhoneCache, rememberOps, writePhoneCache } from "./phone-queue.js"
 import { pushOps, readAll, readChanges, watchChanges } from "../sync/api.js"
 import { applyRemote } from "../sync/edits.js"
 import { deliveryOperations } from "./delivery.js"
@@ -25,10 +26,13 @@ function layerOf(docs: SnapshotEntity[], id: string): Layer | null {
 }
 
 export function useProject(session: Session) {
+  const phone = isPhoneApp()
+  const cached = phone && session.projectId ? readPhoneCache(localStorage, session.projectId) : { ops: [], docs: [] }
   const cursor = useRef(0)
-  const [docs, setDocs] = useState<SnapshotEntity[]>([])
-  const [loading, setLoading] = useState(true)
+  const [docs, setDocs] = useState<SnapshotEntity[]>(cached.docs)
+  const [loading, setLoading] = useState(cached.docs.length === 0)
   const [failed, setFailed] = useState(false)
+  const [pending, setPending] = useState(cached.ops.length)
   const [upgrade, setUpgrade] = useState(false)
   const [conflict, setConflict] = useState<Conflict | null>(null)
   const [lastSync, setLastSync] = useState<string | null>(null)
@@ -43,26 +47,74 @@ export function useProject(session: Session) {
       setUpgrade(true)
       return
     }
-    if (page.changes.length > 0) setDocs((current) => applyRemote(current, page.changes))
+    if (page.changes.length > 0) {
+      setDocs((current) => {
+        const next = applyRemote(current, page.changes)
+        if (phone && session.projectId) {
+          const stored = readPhoneCache(localStorage, session.projectId)
+          writePhoneCache(localStorage, session.projectId, { ops: stored.ops, docs: next })
+        }
+        return next
+      })
+    }
     cursor.current = page.nextCursor
     setLastSync(new Date().toISOString())
     setFailed(false)
     if (page.hasMore) await pull()
-  }, [session])
+  }, [phone, session])
+
+  const flushPending = useCallback(async () => {
+    if (!phone || !session.projectId) return
+    const projectId = session.projectId
+    let guard = 0
+    while (guard < 20) {
+      guard += 1
+      const cache = readPhoneCache(localStorage, projectId)
+      if (cache.ops.length === 0) {
+        setPending(0)
+        return
+      }
+      const batch = cache.ops.slice(0, 200)
+      const response = await pushOps(session, batch, false)
+      const done = new Set<string>()
+      for (const result of response.results) {
+        if (result.status === "applied" || result.status === "duplicate" || result.status === "rejected") done.add(result.opId)
+        if (result.status === "conflict") {
+          done.add(result.opId)
+          const operation = batch.find((item) => item.opId === result.opId) ?? batch[0]
+          if (operation) setConflict({ operation, serverVersion: result.serverVersion, serverPayload: result.serverPayload, serverDeleted: result.serverDeleted })
+        }
+      }
+      if (done.size === 0) return
+      const left = forgetOps(cache.ops, done)
+      writePhoneCache(localStorage, projectId, { ops: left, docs: cache.docs })
+      setPending(left.length)
+      await pull()
+      if (left.length === 0) return
+    }
+  }, [phone, pull, session])
 
   useEffect(() => {
     let cancelled = false
-    setLoading(true)
+    const stored = phone && session.projectId ? readPhoneCache(localStorage, session.projectId) : { ops: [], docs: [] }
+    if (stored.docs.length > 0) setDocs(stored.docs)
+    else setLoading(true)
     readAll(session)
       .then((loaded) => {
         if (cancelled) return
         if (loaded.schemaVersion !== 1) setUpgrade(true)
-        setDocs(loaded.entities)
+        const ops = phone && session.projectId ? readPhoneCache(localStorage, session.projectId).ops : []
+        const merged = ops.length > 0 ? applyLocal(loaded.entities, ops) : loaded.entities
+        setDocs(merged)
+        if (phone && session.projectId) writePhoneCache(localStorage, session.projectId, { ops, docs: merged })
+        setPending(ops.length)
         cursor.current = loaded.watermark
         undoStack.current = []
         redoStack.current = []
         setHistory({ undo: 0, redo: 0 })
         setLastSync(new Date().toISOString())
+        setFailed(false)
+        if (ops.length > 0) void flushPending().catch(() => setFailed(true))
       })
       .catch(() => {
         if (!cancelled) setFailed(true)
@@ -73,19 +125,23 @@ export function useProject(session: Session) {
     return () => {
       cancelled = true
     }
-  }, [session])
+  }, [flushPending, phone, session])
 
   useEffect(() => {
     const controller = new AbortController()
     void watchChanges(session, controller.signal, (event) => {
       if (event === "changes-available") void pull().catch(() => setFailed(true))
     })
-    const timer = window.setInterval(() => void pull().catch(() => setFailed(true)), 20_000)
+    const timer = window.setInterval(() => {
+      const waiting = phone && session.projectId ? readPhoneCache(localStorage, session.projectId).ops.length : 0
+      const job = waiting > 0 ? flushPending() : pull()
+      void job.catch(() => setFailed(true))
+    }, 20_000)
     return () => {
       controller.abort()
       window.clearInterval(timer)
     }
-  }, [pull, session])
+  }, [flushPending, phone, pull, session])
 
   function publishHistory() {
     setHistory({ undo: undoStack.current.length, redo: redoStack.current.length })
@@ -113,8 +169,29 @@ export function useProject(session: Session) {
       await pull()
       return true
     } catch (error) {
-      if (error instanceof Error && error.message === "upgrade") setUpgrade(true)
-      else setFailed(true)
+      if (error instanceof Error && error.message === "upgrade") {
+        setUpgrade(true)
+        return false
+      }
+      // A phone keeps the edit. The same operation is sent again when the server answers.
+      if (phone && session.projectId) {
+        const projectId = session.projectId
+        const cache = readPhoneCache(localStorage, projectId)
+        const ops = rememberOps(cache.ops, stamped)
+        setDocs((current) => {
+          const next = applyLocal(current, stamped)
+          writePhoneCache(localStorage, projectId, { ops, docs: next })
+          return next
+        })
+        setPending(ops.length)
+        if (step) {
+          undoStack.current.push(step)
+          redoStack.current = []
+          publishHistory()
+        }
+        return true
+      }
+      setFailed(true)
       return false
     }
   }
@@ -350,5 +427,5 @@ export function useProject(session: Session) {
   }
 
   const controlPoints = docs.filter((item) => item.entityType === "controlPoint" && !item.deleted).map((item) => item.payload as ControlPoint)
-  return { model, loading, failed, setFailed, upgrade, conflict, setConflict, lastSync, pull, send, renameLayer, restyleLayer, deleteLayer, createPointLayer, createGroup, setLayerGroup, createPoint, createFeature, renameFeature, deleteFeature, movePoint, updateGeometry, reorderLayers, importLayer, recordsIn, sendLayer, controlPoints, addControlPoint, deleteControlPoint, seatFeatures, canUndo: history.undo > 0, canRedo: history.redo > 0, undo: () => play("undo"), redo: () => play("redo") }
+  return { model, loading, failed, setFailed, pending, flush: () => flushPending().catch(() => setFailed(true)), upgrade, conflict, setConflict, lastSync, pull, send, renameLayer, restyleLayer, deleteLayer, createPointLayer, createGroup, setLayerGroup, createPoint, createFeature, renameFeature, deleteFeature, movePoint, updateGeometry, reorderLayers, importLayer, recordsIn, sendLayer, controlPoints, addControlPoint, deleteControlPoint, seatFeatures, canUndo: history.undo > 0, canRedo: history.redo > 0, undo: () => play("undo"), redo: () => play("redo") }
 }
