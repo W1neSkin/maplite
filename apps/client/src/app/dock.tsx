@@ -1,7 +1,7 @@
 import { useState, type Ref } from "react"
 import { formatWhen } from "../i18n/format.js"
 import { t } from "../i18n/translate.js"
-import { BackIcon, CheckIcon, CloseIcon, DisconnectIcon, IconButton, LayersIcon, LocateIcon, PinIcon, SyncIcon, UndoIcon } from "./icons.js"
+import { BackIcon, CheckIcon, CloseIcon, DisconnectIcon, FitIcon, IconButton, LayersIcon, LocateIcon, PinIcon, SyncIcon, UndoIcon } from "./icons.js"
 
 export function MapDock(props: {
   dockRef: Ref<HTMLElement>
@@ -90,10 +90,13 @@ export function PlacingBar(props: {
   )
 }
 
-export function SyncActions(props: { lastSync: string | null; onSync: () => void; onBack: (() => void) | null; onDisconnect: () => void }) {
+export function SyncActions(props: { lastSync: string | null; onSync: () => void; onFit: () => void; fitLabel: string; onBack: (() => void) | null; onDisconnect: () => void }) {
   const synced = props.lastSync ? t("lastSync", { time: formatWhen(props.lastSync) }) : t("syncNow")
   return (
     <>
+      <IconButton tone="fill" aria-label={props.fitLabel} title={props.fitLabel} onClick={props.onFit}>
+        <FitIcon />
+      </IconButton>
       <IconButton tone="fill" aria-label={t("syncNow")} title={synced} onClick={props.onSync}>
         <SyncIcon />
       </IconButton>

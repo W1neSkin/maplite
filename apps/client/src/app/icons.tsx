@@ -116,6 +116,17 @@ export function UndoIcon() {
   )
 }
 
+export function FitIcon() {
+  return (
+    <Glyph>
+      <path d="M4 9V4h5" />
+      <path d="M20 9V4h-5" />
+      <path d="M4 15v5h5" />
+      <path d="M20 15v5h-5" />
+    </Glyph>
+  )
+}
+
 export function ExportIcon() {
   return (
     <Glyph>

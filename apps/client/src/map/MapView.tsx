@@ -22,6 +22,7 @@ export type MapCallout = { coordinate: [number, number]; title: string; layer: s
 
 export type MapHandle = {
   fit(): void
+  fitBox(box: [number, number, number, number]): void
   show(id: string, padding: [number, number, number, number]): void
   locate(): Promise<[number, number] | null>
 }
@@ -325,6 +326,22 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
       const source = sourceRef.current
       if (!map || !source) return
       fitSource(map, source)
+    },
+    fitBox(box) {
+      const map = mapRef.current
+      const size = map?.getSize()
+      if (!map || !size) return
+      const projection = map.getView().getProjection()
+      const southWest = transform([box[0], box[1]], "EPSG:4326", projection)
+      const northEast = transform([box[2], box[3]], "EPSG:4326", projection)
+      const extent: [number, number, number, number] = [
+        Math.min(southWest[0] ?? 0, northEast[0] ?? 0),
+        Math.min(southWest[1] ?? 0, northEast[1] ?? 0),
+        Math.max(southWest[0] ?? 0, northEast[0] ?? 0),
+        Math.max(southWest[1] ?? 0, northEast[1] ?? 0),
+      ]
+      map.getView().cancelAnimations()
+      map.getView().fit(extent, { padding: [72, 48, 150, 16], maxZoom: 16, duration: 200, size })
     },
     show(id: string, padding: [number, number, number, number]) {
       const map = mapRef.current

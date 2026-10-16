@@ -8,6 +8,7 @@ export const messages = {
   more: "More",
   symbolsTitle: "Symbols",
   fitLayers: "Fit layers",
+  fitLayer: "Fit layer",
   tryAgain: "Try again",
   featureCount: "{count} features",
   connectTitle: "Connect to server",

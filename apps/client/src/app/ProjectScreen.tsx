@@ -5,6 +5,7 @@ import { anchorOf } from "../map/anchor.js"
 import { readDisplayDatum, writeDisplayDatum, zoneProfile, type DisplayDatum } from "../map/display-crs.js"
 import { MapView, type MapHandle } from "../map/MapView.js"
 import { ensureProjection } from "../map/register-crs.js"
+import { featureBounds } from "../map/bounds.js"
 import { paddingFromOverlays, type ScreenBox } from "../map/frame.js"
 import { copyOperation, overwriteOperation } from "../sync/edits.js"
 import { ConflictCard } from "./cards.js"
@@ -183,6 +184,14 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
     markReveal(id)
   }
 
+  function fitShown() {
+    const features = openLayer
+      ? project.model.features.filter((feature) => feature.layerId === openLayer.id)
+      : project.model.features.filter((feature) => !hidden.has(feature.layerId))
+    const box = featureBounds(features)
+    if (box) mapRef.current?.fitBox(box)
+  }
+
   function syncNow() {
     void project.pull().catch(() => project.setFailed(true))
   }
@@ -291,7 +300,7 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
               onDelete={() => void project.deleteLayer(openLayer.id).then((ok) => { if (!ok) return; if (openLayerId === openLayer.id) setOpenLayerId(null); setSelectedId(null) })}
             />
           ) : null}
-          footer={<SyncActions lastSync={project.lastSync} onSync={syncNow} onBack={onBack} onDisconnect={onDisconnect} />}
+          footer={<SyncActions lastSync={project.lastSync} onSync={syncNow} onFit={fitShown} fitLabel={t(openLayer ? "fitLayer" : "fitLayers")} onBack={onBack} onDisconnect={onDisconnect} />}
         >
           {outcome ? (
             <ImportBody
