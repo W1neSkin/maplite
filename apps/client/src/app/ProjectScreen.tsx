@@ -60,6 +60,7 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
   const [placingLayerId, setPlacingLayerId] = useState<string | null>(null)
   const [placeName, setPlaceName] = useState("")
   const [vertices, setVertices] = useState<[number, number][]>([])
+  const [styleOpen, setStyleOpen] = useState(false)
   const placeNameTouched = useRef(false)
   const [reveal, setReveal] = useState<{ id: string; token: number } | null>(null)
   const [cursor, setCursor] = useState<[number, number] | null>(null)
@@ -72,6 +73,7 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
   const zipRef = useRef<Uint8Array | null>(null)
   const status = project.upgrade ? t("upgradeRequired") : project.failed ? t("serverUnavailable") : basemapFailed ? t("basemapUnavailable") : locationOff ? t("locationOff") : null
   const openLayer = openLayerId ? project.model.layers.find((layer) => layer.id === openLayerId) ?? null : null
+  useEffect(() => setStyleOpen(false), [openLayerId])
   const placingLayer = placingLayerId ? project.model.layers.find((layer) => layer.id === placingLayerId) ?? null : null
 
   useLayoutEffect(() => {
@@ -277,6 +279,9 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
           actions={!outcome && openLayer ? (
             <LayerActions
               geometryType={openLayer.geometryType}
+              color={openLayer.color}
+              styleOpen={styleOpen}
+              onStyle={() => setStyleOpen((open) => !open)}
               onAdd={beginAdd}
               onExport={() => {
                 const file = layerZip(openLayer.name, openLayer.geometryType, project.recordsIn(openLayer.id))
@@ -307,7 +312,7 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
             />
           ) : (
           <>
-          {openLayer ? (
+          {openLayer && styleOpen ? (
             <LayerStyle
               color={openLayer.color}
               fillOpacity={openLayer.fillOpacity}

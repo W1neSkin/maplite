@@ -22,13 +22,14 @@ type LayerStyleProps = {
   onOpacity: (fillOpacity: number) => void
 }
 
+/** The palette stays closed. Color is set rarely, so it must not sit on the layer title. */
 export function LayerStyle(props: LayerStyleProps) {
   const [opacity, setOpacity] = useState(props.fillOpacity)
   useEffect(() => setOpacity(props.fillOpacity), [props.fillOpacity])
   const known = LAYER_COLORS.some((item) => item.hex.toLowerCase() === props.color.toLowerCase())
   const colors = known ? LAYER_COLORS : [{ hex: props.color, label: "layerColor" as const }, ...LAYER_COLORS]
   return (
-    <div className="mb-1 flex flex-col gap-1">
+    <div className="mb-2 flex flex-col gap-2 rounded-xl bg-neutral-50 p-2">
       <div className="flex flex-wrap gap-1">
         {colors.map((item) => {
           const selected = item.hex.toLowerCase() === props.color.toLowerCase()

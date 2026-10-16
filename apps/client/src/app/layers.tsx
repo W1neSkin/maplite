@@ -205,12 +205,13 @@ function NewLayer(props: { onCreate: (name: string, geometryType: MapLayer["geom
   )
 }
 
-export function LayerActions(props: { geometryType: MapLayer["geometryType"]; onAdd: () => void; onExport: () => void; onDelete: () => void }) {
+export function LayerActions(props: { geometryType: MapLayer["geometryType"]; color: string; styleOpen: boolean; onStyle: () => void; onAdd: () => void; onExport: () => void; onDelete: () => void }) {
   return (
     <>
       <IconButton tone="fill" aria-label={t(props.geometryType === "Point" ? "addToLayer" : props.geometryType === "LineString" ? "drawLine" : "drawPolygon")} title={t(props.geometryType === "Point" ? "addToLayer" : props.geometryType === "LineString" ? "drawLine" : "drawPolygon")} onClick={props.onAdd}>
         {props.geometryType === "Point" ? <PinIcon /> : <GeometryGlyph type={props.geometryType} />}
       </IconButton>
+      <button type="button" aria-label={t("layerColor")} aria-pressed={props.styleOpen} title={t("layerColor")} className={props.styleOpen ? "h-8 w-8 shrink-0 rounded-full ring-2 ring-neutral-900 ring-offset-1" : "h-8 w-8 shrink-0 rounded-full"} style={{ backgroundColor: props.color }} onClick={props.onStyle} />
       <IconButton tone="fill" aria-label={t("exportLayer")} title={t("exportLayer")} onClick={props.onExport}>
         <ExportIcon />
       </IconButton>
