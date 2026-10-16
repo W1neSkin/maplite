@@ -1,6 +1,5 @@
 import Feature from "ol/Feature"
 import Point from "ol/geom/Point"
-import { fromLonLat } from "ol/proj"
 import VectorSource from "ol/source/Vector"
 import Circle from "ol/style/Circle"
 import Fill from "ol/style/Fill"
@@ -20,9 +19,9 @@ export function hereStyle(): Style {
   })
 }
 
-export function placeHere(source: VectorSource, coordinate: [number, number]): void {
+export function placeHere(source: VectorSource, projected: number[]): void {
   source.clear()
-  source.addFeature(new Feature(new Point(fromLonLat(coordinate))))
+  source.addFeature(new Feature(new Point(projected)))
 }
 
 /** One fix. The caller decides whether a failure should be shown. */

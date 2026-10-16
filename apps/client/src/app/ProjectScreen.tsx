@@ -2,7 +2,9 @@ import { createId } from "@cartography/project-schema"
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import "../extensions.js"
 import { anchorOf } from "../map/anchor.js"
+import { readDisplayDatum, writeDisplayDatum, zoneProfile, type DisplayDatum } from "../map/display-crs.js"
 import { MapView, type MapHandle } from "../map/MapView.js"
+import { ensureProjection } from "../map/register-crs.js"
 import { paddingFromOverlays, type ScreenBox } from "../map/frame.js"
 import { copyOperation, overwriteOperation } from "../sync/edits.js"
 import { ConflictCard } from "./cards.js"
@@ -60,6 +62,8 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
   const [coordEdit, setCoordEdit] = useState(false)
   const [hidden, setHidden] = useState<Set<string>>(() => readHidden(session.projectId ?? ""))
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null)
+  const [datum, setDatum] = useState<DisplayDatum>(() => readDisplayDatum())
+  const [mapCenter, setMapCenter] = useState<[number, number] | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const zipRef = useRef<Uint8Array | null>(null)
   const status = project.upgrade ? t("upgradeRequired") : project.failed ? t("serverUnavailable") : basemapFailed ? t("basemapUnavailable") : locationOff ? t("locationOff") : null
@@ -174,6 +178,16 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
   const selected = project.model.features.find((feature) => feature.id === selectedId) ?? null
   const selectedPoint = selected?.geometry.type === "Point" ? selected.geometry.coordinates : null
   const coordValue = !placingLayerId && selectedPoint ? selectedPoint : cursor
+  const zone = datum !== "web" && mapCenter ? zoneProfile(datum, mapCenter[0], mapCenter[1]) : null
+  const activeProfile = zone && !zone.outside ? zone.profile : null
+  if (activeProfile) ensureProjection(activeProfile)
+  const usable: DisplayDatum[] = ["web"]
+  if (mapCenter) {
+    for (const item of ["SK42", "SK95", "GSK2011"] as const) {
+      const candidate = zoneProfile(item, mapCenter[0], mapCenter[1])
+      if (candidate && !candidate.outside) usable.push(item)
+    }
+  }
   const callout = selected && !placingLayerId && !hidden.has(selected.layerId)
     ? { coordinate: anchorOf(selected.geometry), title: selected.name, layer: project.model.layers.find((layer) => layer.id === selected.layerId)?.name ?? "" }
     : null
@@ -186,7 +200,9 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
         selectedId={selectedId}
         placing={placingLayerId !== null}
         callout={callout}
+        projectionId={activeProfile?.id ?? null}
         onBasemapFailed={setBasemapFailed}
+        onCenter={setMapCenter}
         onPlace={(coordinate) => { setCursor(coordinate); void placeAt(coordinate) }}
         onCursor={setCursor}
         onLocated={setCursor}
@@ -293,6 +309,12 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
         editing={coordEdit}
         canEdit={placingLayerId !== null || selectedPoint !== null}
         session={session}
+        datum={datum}
+        zone={activeProfile?.zone ?? null}
+        profile={activeProfile}
+        outside={datum !== "web" && mapCenter != null && activeProfile == null}
+        usable={usable}
+        onDatum={(next) => { setDatum(next); writeDisplayDatum(next) }}
         onEdit={() => setCoordEdit(true)}
         onCancel={() => setCoordEdit(false)}
         onSave={(coordinate) => {

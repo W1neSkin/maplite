@@ -7,7 +7,7 @@ import GeoJSON from "ol/format/GeoJSON"
 import Overlay from "ol/Overlay"
 import TileLayer from "ol/layer/Tile"
 import VectorLayer from "ol/layer/Vector"
-import { fromLonLat, toLonLat } from "ol/proj"
+import { fromLonLat, get as getProjection, transform } from "ol/proj"
 import OSM from "ol/source/OSM"
 import VectorSource from "ol/source/Vector"
 import { t } from "../i18n/translate.js"
@@ -30,7 +30,9 @@ type MapViewProps = {
   selectedId?: string | null
   placing?: boolean
   callout?: MapCallout | null
+  projectionId?: string | null
   onBasemapFailed: (failed: boolean) => void
+  onCenter?: (coordinate: [number, number]) => void
   onSelect?: (featureId: string | null) => void
   onPlace?: (coordinate: [number, number]) => void
   onCursor?: (coordinate: [number, number]) => void
@@ -51,10 +53,19 @@ function fitSource(map: Map, source: VectorSource): void {
  * OpenLayers calls its geographic CRS EPSG:4326 and stores longitude first.
  * That matches OGC:CRS84. It is not the formal EPSG:4326 axis order.
  */
-function toOlFeature(feature: MapFeature, selected: boolean) {
+function lonLatFromView(map: Map, coordinate: number[]): [number, number] {
+  const [longitude, latitude] = transform(coordinate, map.getView().getProjection(), "EPSG:4326")
+  return [longitude, latitude]
+}
+
+function viewFromLonLat(map: Map, coordinate: [number, number]): number[] {
+  return transform(coordinate, "EPSG:4326", map.getView().getProjection())
+}
+
+function toOlFeature(feature: MapFeature, selected: boolean, projection: string) {
   const read = format.readFeature(
     { type: "Feature", geometry: feature.geometry, properties: { name: feature.name } },
-    { dataProjection: "EPSG:4326", featureProjection: "EPSG:3857" },
+    { dataProjection: "EPSG:4326", featureProjection: projection },
   )
   const olFeature = Array.isArray(read) ? read[0] : read
   if (!olFeature) throw new Error("Could not read feature")
@@ -102,7 +113,7 @@ function showFeature(map: Map, source: VectorSource, id: string, padding: [numbe
   view.fit(extent, { padding: fitted, maxZoom: typeof zoom === "number" ? zoom : 16, duration: 180, size })
 }
 
-export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ features, selectedId = null, placing = false, callout = null, onBasemapFailed, onSelect, onPlace, onCursor, onLocated }, ref) {
+export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ features, selectedId = null, placing = false, callout = null, projectionId = null, onBasemapFailed, onSelect, onPlace, onCursor, onLocated, onCenter }, ref) {
   const target = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
   const sourceRef = useRef<VectorSource | null>(null)
@@ -113,14 +124,17 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
   const placeRef = useRef(onPlace)
   const cursorRef = useRef(onCursor)
   const locatedRef = useRef(onLocated)
+  const centerRef = useRef(onCenter)
   const placingRef = useRef(placing)
   const didFit = useRef(false)
   const hasHere = useRef(false)
+  const hereLonLat = useRef<[number, number] | null>(null)
   const [rotation, setRotation] = useState(0)
   selectRef.current = onSelect
   placeRef.current = onPlace
   cursorRef.current = onCursor
   locatedRef.current = onLocated
+  centerRef.current = onCenter
   placingRef.current = placing
 
   useLayoutEffect(() => {
@@ -164,8 +178,7 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
     calloutElement.current = bubble
     const onClick = (event: { pixel: number[]; coordinate?: number[] }) => {
       if (event.coordinate) {
-        const [longitude, latitude] = toLonLat(event.coordinate)
-        const picked: [number, number] = [longitude, latitude]
+        const picked = lonLatFromView(map, event.coordinate)
         cursorRef.current?.(picked)
         if (placingRef.current) {
           placeRef.current?.(picked)
@@ -184,18 +197,29 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
     map.on("singleclick", onClick)
     const onRotate = () => setRotation(map.getView().getRotation())
     map.getView().on("change:rotation", onRotate)
+    const onMove = () => {
+      const center = map.getView().getCenter()
+      if (!center) return
+      centerRef.current?.(lonLatFromView(map, center))
+    }
+    map.on("moveend", onMove)
+    onMove()
     void readPosition()
       .then((coordinate) => {
         if (mapRef.current !== map) return
         hasHere.current = true
-        placeHere(here, coordinate)
-        map.getView().setCenter(fromLonLat(coordinate))
-        map.getView().setZoom(HERE_ZOOM)
+        hereLonLat.current = coordinate
+        placeHere(here, viewFromLonLat(map, coordinate))
+        const view = map.getView()
+        view.setCenter(viewFromLonLat(map, coordinate))
+        if (view.getProjection().getCode() === "EPSG:3857") view.setZoom(HERE_ZOOM)
+        else view.setResolution(2)
         locatedRef.current?.(coordinate)
       })
       .catch(() => {})
     return () => {
       map.un("singleclick", onClick)
+      map.un("moveend", onMove)
       map.getView().un("change:rotation", onRotate)
       tiles.un("tileloaderror", onError)
       tiles.un("tileloadend", onLoad)
@@ -211,15 +235,38 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
 
   useLayoutEffect(() => {
     const map = mapRef.current
+    if (!map) return
+    const next = projectionId ?? "EPSG:3857"
+    const view = map.getView()
+    if (view.getProjection().getCode() === next) return
+    const center = view.getCenter()
+    if (!center) return
+    const geographic = lonLatFromView(map, center)
+    const moved = transform(geographic, "EPSG:4326", next)
+    const rotationNow = view.getRotation()
+    const resolution = view.getResolution()
+    map.setView(new View({ projection: next, center: moved, resolution, rotation: rotationNow, extent: next === "EPSG:3857" ? undefined : getProjection(next)?.getExtent() }))
+    const fix = hereLonLat.current
+    const here = hereRef.current
+    if (fix && here) placeHere(here, transform(fix, "EPSG:4326", next))
+    const onRotateNow = () => setRotation(map.getView().getRotation())
+    map.getView().on("change:rotation", onRotateNow)
+    setRotation(map.getView().getRotation())
+    return () => map.getView().un("change:rotation", onRotateNow)
+  }, [projectionId])
+
+  useLayoutEffect(() => {
+    const map = mapRef.current
     const source = sourceRef.current
     if (!map || !source) return
+    const projection = map.getView().getProjection().getCode()
     source.clear()
-    source.addFeatures(features.map((feature) => toOlFeature(feature, feature.id === selectedId)))
+    source.addFeatures(features.map((feature) => toOlFeature(feature, feature.id === selectedId, projection)))
     if (!didFit.current && features.length > 0 && !hasHere.current) {
       fitSource(map, source)
       didFit.current = true
     }
-  }, [features, selectedId])
+  }, [features, selectedId, projectionId])
 
   useLayoutEffect(() => {
     const overlay = calloutOverlay.current
@@ -235,8 +282,10 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
     const layer = document.createElement("span")
     layer.textContent = callout.layer
     element.append(title, layer)
-    overlay.setPosition(fromLonLat(callout.coordinate))
-  }, [callout])
+    const map = mapRef.current
+    if (!map) return
+    overlay.setPosition(viewFromLonLat(map, callout.coordinate))
+  }, [callout, projectionId])
 
   useImperativeHandle(ref, () => ({
     fit() {
@@ -258,9 +307,12 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
       try {
         const coordinate = await readPosition()
         hasHere.current = true
-        placeHere(here, coordinate)
+        hereLonLat.current = coordinate
+        placeHere(here, viewFromLonLat(map, coordinate))
         map.getView().cancelAnimations()
-        map.getView().animate({ center: fromLonLat(coordinate), zoom: HERE_ZOOM, duration: 250 })
+        const view = map.getView()
+        if (view.getProjection().getCode() === "EPSG:3857") view.animate({ center: viewFromLonLat(map, coordinate), zoom: HERE_ZOOM, duration: 250 })
+        else view.animate({ center: viewFromLonLat(map, coordinate), resolution: 2, duration: 250 })
         return coordinate
       } catch {
         return null
