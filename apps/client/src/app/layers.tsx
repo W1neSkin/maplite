@@ -1,5 +1,6 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { t } from "../i18n/translate.js"
+import { measureLabel } from "./measure-label.js"
 import type { MapFeature, MapLayer } from "./model.js"
 import { CheckIcon, CloseIcon, ExportIcon, EyeIcon, EyeOffIcon, GeometryGlyph, GripIcon, IconButton, ImportIcon, PencilIcon, PinIcon, PlusIcon, TrashIcon } from "./icons.js"
 
@@ -141,22 +142,26 @@ function FeatureRow(props: { feature: MapFeature; selected: boolean; onSelect: (
       </li>
     )
   }
+  const size = props.selected ? measureLabel(props.feature.geometry) : null
   return (
-    <li ref={rowRef} className={props.selected ? "flex items-center rounded-lg bg-[var(--primary)]/10" : "flex items-center"}>
-      <button type="button" className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg px-1 text-left text-sm" onClick={props.onSelect}>
-        <GeometryGlyph type={props.feature.geometry.type} color={props.feature.color} />
-        <span className="truncate">{props.feature.name}</span>
-      </button>
-      {props.selected ? (
-        <>
-          <IconButton aria-label={t("rename")} title={t("rename")} onClick={() => setEditing(true)}>
-            <PencilIcon />
-          </IconButton>
-          <IconButton aria-label={t("deleteFeature")} title={t("deleteFeature")} onClick={props.onDelete}>
-            <TrashIcon />
-          </IconButton>
-        </>
-      ) : null}
+    <li ref={rowRef} className={props.selected ? "rounded-lg bg-[var(--primary)]/10" : ""}>
+      <div className="flex items-center">
+        <button type="button" className="flex h-8 min-w-0 flex-1 items-center gap-2 rounded-lg px-1 text-left text-sm" onClick={props.onSelect}>
+          <GeometryGlyph type={props.feature.geometry.type} color={props.feature.color} />
+          <span className="truncate">{props.feature.name}</span>
+        </button>
+        {props.selected ? (
+          <>
+            <IconButton aria-label={t("rename")} title={t("rename")} onClick={() => setEditing(true)}>
+              <PencilIcon />
+            </IconButton>
+            <IconButton aria-label={t("deleteFeature")} title={t("deleteFeature")} onClick={props.onDelete}>
+              <TrashIcon />
+            </IconButton>
+          </>
+        ) : null}
+      </div>
+      {size ? <p className="px-7 pb-1 text-xs text-neutral-500">{size}</p> : null}
     </li>
   )
 }
