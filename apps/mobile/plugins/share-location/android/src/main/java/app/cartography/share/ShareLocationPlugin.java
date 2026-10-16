@@ -3,6 +3,7 @@ package app.cartography.share;
 import android.Manifest;
 import android.content.Intent;
 import android.os.Build;
+import android.provider.Settings;
 import com.getcapacitor.JSObject;
 import com.getcapacitor.PermissionState;
 import com.getcapacitor.Plugin;
@@ -80,6 +81,26 @@ public class ShareLocationPlugin extends Plugin {
     public void clearTrack(PluginCall call) {
         TrackFile.clear(getContext());
         call.resolve();
+    }
+
+    /** The name the person set on the phone, not the placeholder "Phone". */
+    @PluginMethod
+    public void deviceName(PluginCall call) {
+        // Some phones throw when the global name is unreadable. Always answer,
+        // or the join screen waits forever.
+        String name = "";
+        try {
+            name = Settings.Global.getString(getContext().getContentResolver(), "device_name");
+            if (name == null || name.trim().isEmpty()) {
+                name = Settings.Secure.getString(getContext().getContentResolver(), "bluetooth_name");
+            }
+        } catch (Exception ignored) {
+            name = "";
+        }
+        if (name == null || name.trim().isEmpty()) name = Build.MODEL;
+        JSObject result = new JSObject();
+        result.put("name", name == null ? "" : name.trim());
+        call.resolve(result);
     }
 
     @PluginMethod

@@ -11,6 +11,8 @@
   },
   "scripts": {
     "dev": "corepack pnpm --parallel --filter @cartography/server --filter @cartography/client dev",
+    "host:install": "corepack pnpm install --frozen-lockfile && corepack pnpm --filter @cartography/server build",
+    "host": "node apps/server/dist/index.js",
     "build": "corepack pnpm -r --filter \"!cartographic-workspace\" --if-present build",
     "typecheck": "corepack pnpm -r --filter \"!cartographic-workspace\" --if-present typecheck",
     "lint": "eslint . && node scripts/check-boundaries.mjs && node scripts/check-i18n.mjs",

@@ -11,6 +11,7 @@ export interface ShareLocationPlugin {
   readOutbox(options: { projectId: string }): Promise<{ ops: unknown[]; docs: unknown[] }>
   writeOutbox(options: { projectId: string; body: string }): Promise<void>
   allowRemote(options: { allow: boolean }): Promise<void>
+  deviceName(): Promise<{ name: string }>
 }
 
 /** Android foreground service. The browser has no implementation and the caller keeps the page watcher. */

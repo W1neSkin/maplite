@@ -42,6 +42,25 @@ export function deviceLabel(): string {
   return localStorage.getItem(NAME_KEY)?.trim() || "Phone"
 }
 
+/** A saved placeholder is not a chosen name. The phone's own name replaces it. */
+export async function defaultDeviceName(): Promise<string> {
+  const saved = localStorage.getItem(NAME_KEY)?.trim()
+  if (saved && saved !== "Phone") return saved
+  if (isPhoneApp()) {
+    try {
+      const body = await ShareLocation.deviceName()
+      const name = body.name?.trim()
+      if (name) {
+        rememberDeviceLabel(name)
+        return name
+      }
+    } catch {
+      // The page keeps the placeholder when the phone will not say its name.
+    }
+  }
+  return saved || "Phone"
+}
+
 export function rememberDeviceLabel(name: string): void {
   const next = name.trim() || "Phone"
   localStorage.setItem(NAME_KEY, next)

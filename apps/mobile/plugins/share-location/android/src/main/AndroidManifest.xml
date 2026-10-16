@@ -5,6 +5,8 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION" />
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- The phone reads the enrollment picture. The app manifest is generated locally. -->
+    <uses-permission android:name="android.permission.CAMERA" />
     <application>
         <service
             android:name="app.cartography.share.ShareService"

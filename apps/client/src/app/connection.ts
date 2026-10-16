@@ -10,6 +10,13 @@ const KIND_KEY = "cartography.tokenKind"
 
 export const DEFAULT_SERVER_URL = "http://127.0.0.1:3847"
 
+/** The dev page and the phone shell are not the API. A hosted map page is. */
+export function initialServerUrl(): string {
+  const host = window.location.hostname
+  if (host === "localhost" || host === "127.0.0.1") return DEFAULT_SERVER_URL
+  return window.location.origin
+}
+
 export type Session = {
   server: string
   token: string
@@ -49,6 +56,18 @@ export function isPhoneApp(): boolean {
   if (capacitor?.isNativePlatform?.() === true) return true
   // Android WebView adds "; wv)". A desktop browser does not.
   return typeof navigator !== "undefined" && /; wv\)/.test(navigator.userAgent)
+}
+
+/** A phone that is not enrolled yet should scan a code as soon as it opens. */
+export function phoneNeedsJoin(session: Session | null): boolean {
+  if (!isPhoneApp()) return false
+  if (!session || session.kind !== "device" || !session.projectId) return true
+  try {
+    const host = new URL(session.server).hostname
+    return host === "localhost" || host === "127.0.0.1"
+  } catch {
+    return true
+  }
 }
 
 export function editOrigin(): EditOrigin {

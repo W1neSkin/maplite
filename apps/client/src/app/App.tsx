@@ -1,13 +1,15 @@
 import { useState } from "react"
 import { AdminScreen } from "./AdminScreen.js"
-import { clearSession, readSession, saveSession, type Session } from "./connection.js"
+import { clearSession, phoneNeedsJoin, readSession, saveSession, type Session } from "./connection.js"
 import { ConnectScreen } from "./ConnectScreen.js"
+import { PhoneConnect } from "./phone-connect.js"
 import { ProjectScreen } from "./ProjectScreen.js"
 
 export function App() {
   const [session, setSession] = useState<Session | null>(() => readSession())
   const [fromAdmin, setFromAdmin] = useState(false)
 
+  if (phoneNeedsJoin(session)) return <PhoneConnect onConnected={setSession} />
   if (!session) return <ConnectScreen onConnected={setSession} />
   if (!session.projectId) {
     return (

@@ -7,7 +7,7 @@ import type { CapacitorConfig } from "@capacitor/cli"
  */
 const config: CapacitorConfig = {
   appId: "app.cartography.workspace",
-  appName: "Cartographic Workspace",
+  appName: "MapLite",
   webDir: "../client/dist",
   server: {
     androidScheme: "https",

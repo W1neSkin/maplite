@@ -124,6 +124,13 @@ export function listDevices(db: AppDatabase, projectId: string): DeviceSummary[]
   }))
 }
 
+export function renameDevice(db: AppDatabase, projectId: string, deviceId: string, name: string): boolean {
+  const next = name.trim()
+  if (!next || next.length > 80) return false
+  const updated = db.prepare("UPDATE devices SET display_name = ? WHERE id = ? AND project_id = ?").run(next, deviceId, projectId)
+  return updated.changes === 1
+}
+
 /** Drops this device only. Other devices keep their tokens. */
 export function removeDevice(db: AppDatabase, projectId: string, deviceId: string): boolean {
   const device = db.prepare("SELECT id FROM devices WHERE id = ? AND project_id = ?").get(deviceId, projectId)

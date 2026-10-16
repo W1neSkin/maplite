@@ -3,14 +3,15 @@ import { PRODUCT_NAME } from "../brand.js"
 import { Button } from "../components/ui/button.js"
 import { t } from "../i18n/translate.js"
 import { readSessionRole } from "../sync/api.js"
-import { DEFAULT_SERVER_URL, saveSession, type Session } from "./connection.js"
+import { initialServerUrl, saveSession, type Session } from "./connection.js"
 
 type ConnectProps = {
   onConnected: (session: Session) => void
 }
 
 export function ConnectScreen({ onConnected }: ConnectProps) {
-  const [server, setServer] = useState(DEFAULT_SERVER_URL)
+  const [server, setServer] = useState(initialServerUrl)
+  const localPage = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1"
   const [token, setToken] = useState("")
   const [remember, setRemember] = useState(false)
   const [message, setMessage] = useState<string | null>(null)
@@ -57,7 +58,7 @@ export function ConnectScreen({ onConnected }: ConnectProps) {
         {message ? <p role="status">{message}</p> : null}
         <Button type="submit">{t("connect")}</Button>
       </form>
-      <Button
+      {localPage ? <Button
         variant="quiet"
         onClick={() => {
           void fetch(`${server.trim()}/api/v1/dev/bootstrap`)
@@ -72,7 +73,7 @@ export function ConnectScreen({ onConnected }: ConnectProps) {
         }}
       >
         {t("useLocalDemo")}
-      </Button>
+      </Button> : null}
     </main>
   )
 }

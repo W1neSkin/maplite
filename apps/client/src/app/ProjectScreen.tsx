@@ -461,7 +461,7 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
         <Sheet
           ref={sheetRef}
           title={outcome ? t("importData") : devicesOpen ? t("settings") : sendLayerId ? t("sendLayer") : controlsOpen ? t("controlPoints") : openLayerId === LIVE_DEVICE_LAYER ? t("liveTitle") : openLayer ? openLayer.name : t("layersTitle")}
-          onClose={() => { if (outcome) { setOutcome(null); return }; if (devicesOpen) { setDevicesOpen(false); return }; if (sendLayerId) { setSendLayerId(null); return }; if (openLayerId) setOpenLayerId(null); else setSheet(false) }}
+          onClose={() => { if (outcome) { setOutcome(null); return }; if (devicesOpen) { setDevicesOpen(false); setSheet(false); return }; if (sendLayerId) { setSendLayerId(null); return }; if (openLayerId) setOpenLayerId(null); else setSheet(false) }}
           onRename={!outcome && !devicesOpen && !sendLayerId && openLayer && !openLayer.delivery ? (name) => void project.renameLayer(openLayer.id, name) : undefined}
           actions={!outcome && !devicesOpen && !sendLayerId && openLayer ? (
             <LayerActions
@@ -479,6 +479,7 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
               onDelete={() => void project.deleteLayer(openLayer.id).then((ok) => { if (!ok) return; if (openLayerId === openLayer.id) setOpenLayerId(null); setSelectedId(null) })}
             />
           ) : null}
+          tall={devicesOpen && !outcome}
           footer={<SyncActions lastSync={project.lastSync} onSync={syncNow} onFit={fitShown} fitLabel={t(openLayer ? "fitLayer" : "fitLayers")} canUndo={project.canUndo} canRedo={project.canRedo} onUndo={project.undo} onRedo={project.redo} onBack={onBack} onDisconnect={onDisconnect} />}
         >
           {devicesOpen && !outcome ? (
@@ -511,7 +512,7 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
                 setOpenLayerId(id)
                 setSheet(true)
               }}
-              onJoined={onJoined}
+              onJoined={(next) => { onJoined(next); setDevicesOpen(false); setSheet(false) }}
             />
           ) : sendLayerId && !outcome ? (
             <SendPanel session={session} onSend={async (audience) => {

@@ -1,15 +1,18 @@
 import { useEffect, useState } from "react"
 import { formatWhen } from "../i18n/format.js"
 import { t } from "../i18n/translate.js"
-import { createEnrollment, readDevices, redeemCode, removeDevice, sendCommand, type DeviceRow } from "../sync/channel.js"
+import { createEnrollment, readDevices, redeemCode, removeDevice, renameSelf, sendCommand, type DeviceRow } from "../sync/channel.js"
 import { clientId, saveSession, type Session } from "./connection.js"
+import { qrForPage } from "./enrollment.js"
 import { deviceFace, nextMode } from "./device-status.js"
 import { rememberRemote, remoteAllowed, reportLocal } from "./use-commands.js"
 import { BasemapPack } from "./basemap-pack.js"
-import { CheckIcon, IconButton, PlusIcon, TrashIcon } from "./icons.js"
+import { EnrollQr } from "./enroll-qr.js"
+import { ScanCode } from "./scan-code.js"
+import { CheckIcon, IconButton, TrashIcon } from "./icons.js"
 import { ShareLocation } from "../platform/share-location.js"
 import { readLocalTrack } from "./track-store.js"
-import { deviceLabel, rememberDeviceLabel } from "./use-live.js"
+import { defaultDeviceName, deviceLabel, rememberDeviceLabel } from "./use-live.js"
 
 export function DevicesPanel(props: {
   session: Session
@@ -22,14 +25,33 @@ export function DevicesPanel(props: {
   onJoined: (session: Session) => void
 }) {
   const [devices, setDevices] = useState<DeviceRow[]>([])
-  const [code, setCode] = useState<string | null>(null)
+  const [qrText, setQrText] = useState<string | null>(null)
   const [expiresAt, setExpiresAt] = useState<string | null>(null)
-  const [joinCode, setJoinCode] = useState("")
-  const [joinName, setJoinName] = useState("")
+  const [scanning, setScanning] = useState(false)
   const [joinFailed, setJoinFailed] = useState(false)
+  const [joining, setJoining] = useState(false)
 
   function reload() {
     void readDevices(props.session).then(setDevices)
+  }
+
+  function join(code: string, serverUrl: string | null) {
+    const session = serverUrl ? { ...props.session, server: serverUrl } : props.session
+    void defaultDeviceName().then((name) => {
+    setJoinFailed(false)
+    setJoining(true)
+    void redeemCode(session, code, clientId(), name).then((issued) => {
+      setJoining(false)
+      if (!issued) {
+        setJoinFailed(true)
+        return
+      }
+      rememberDeviceLabel(name)
+      const next: Session = { ...session, token: issued.token, projectId: issued.projectId, role: "project", kind: "device", deviceId: issued.deviceId }
+      saveSession(next, true)
+      props.onJoined(next)
+    })
+    })
   }
 
   useEffect(() => {
@@ -41,36 +63,45 @@ export function DevicesPanel(props: {
 
   return (
     <div className="flex flex-col gap-2">
-      <BasemapPack />
-      {props.surface === "device" ? <DeviceName /> : null}
-      {props.surface === "device" ? (
+      {scanning ? (
+        <ScanCode
+          onClose={() => setScanning(false)}
+          onCode={(next, serverUrl) => {
+            setScanning(false)
+            join(next, serverUrl)
+          }}
+        />
+      ) : null}
+      {scanning ? null : <BasemapPack />}
+      {props.surface === "device" && !scanning ? <DeviceName session={props.session} /> : null}
+      {props.surface === "device" && !scanning ? (
         <label className="flex items-center gap-2 text-sm">
           <input type="checkbox" checked={props.sharing} onChange={(event) => { props.onSharing(event.target.checked); reportLocal(props.session, event.target.checked, props.recording) }} />
           {t("shareLive")}
         </label>
       ) : null}
-      {props.surface === "device" ? <TrackRecord recording={props.recording} onRecording={(value) => { props.onRecording(value); reportLocal(props.session, props.sharing, value) }} onSave={props.onSaveTrack} /> : null}
-      {props.surface === "device" ? <RemoteSwitch /> : null}
+      {props.surface === "device" && !scanning ? <TrackRecord recording={props.recording} onRecording={(value) => { props.onRecording(value); reportLocal(props.session, props.sharing, value) }} onSave={props.onSaveTrack} /> : null}
+      {props.surface === "device" && !scanning ? <RemoteSwitch /> : null}
       {props.surface === "main" ? (
         <>
           <div className="flex items-center gap-1">
-            <IconButton
-              tone="fill"
-              aria-label={t("addDevice")}
-              title={t("addDevice")}
+            <button
+              type="button"
+              className="h-8 rounded-full bg-black/5 px-3 text-sm"
               onClick={() => {
                 void createEnrollment(props.session).then((issued) => {
                   if (!issued) return
-                  setCode(issued.code)
+                  setQrText(qrForPage(issued.qrText))
                   setExpiresAt(issued.expiresAt)
                 })
               }}
             >
-              <PlusIcon />
-            </IconButton>
-            {code ? <span className="font-mono text-sm">{code}</span> : null}
+              {t("addDevice")}
+            </button>
           </div>
+          {qrText ? <EnrollQr text={qrText} /> : null}
           {expiresAt ? <p className="text-xs text-neutral-500">{t("enrollmentExpires", { time: formatWhen(expiresAt) })}</p> : null}
+          {devices.length === 0 ? <p className="px-1 text-xs text-neutral-500">{t("noDevices")}</p> : null}
           <ul className="flex flex-col">
             {devices.map((device) => (
               <DeviceControl key={device.id} session={props.session} device={device} onChanged={reload} />
@@ -78,35 +109,11 @@ export function DevicesPanel(props: {
           </ul>
         </>
       ) : null}
-      {props.surface === "device" && props.session.kind !== "device" ? (
-        <form
-          className="flex flex-col gap-1"
-          onSubmit={(event) => {
-            event.preventDefault()
-            const name = joinName.trim()
-            if (!joinCode.trim() || !name) return
-            setJoinFailed(false)
-            void redeemCode(props.session, joinCode, clientId(), name).then((issued) => {
-              if (!issued) {
-                setJoinFailed(true)
-                return
-              }
-              rememberDeviceLabel(name)
-              const next: Session = { ...props.session, token: issued.token, projectId: issued.projectId, role: "project", kind: "device", deviceId: issued.deviceId }
-              saveSession(next, true)
-              props.onJoined(next)
-            })
-          }}
-        >
-          <input aria-label={t("deviceCode")} className="h-8 rounded-lg border border-[var(--border)] px-2 text-sm" value={joinCode} onChange={(event) => setJoinCode(event.target.value)} />
-          <div className="flex items-center gap-1">
-            <input aria-label={t("deviceName")} className="h-8 min-w-0 flex-1 rounded-lg border border-[var(--border)] px-2 text-sm" value={joinName} onChange={(event) => setJoinName(event.target.value)} />
-            <IconButton tone="accent" type="submit" aria-label={t("joinDevice")} title={t("joinDevice")} disabled={!joinCode.trim() || !joinName.trim()}>
-              <PlusIcon />
-            </IconButton>
-          </div>
-          {joinFailed ? <p className="text-xs text-neutral-500">{t("joinFailed")}</p> : null}
-        </form>
+      {props.surface === "device" && props.session.kind !== "device" && !scanning ? (
+        <div className="flex flex-col gap-1">
+          <button type="button" className="h-8 rounded-full bg-black/5 px-3 text-sm" disabled={joining} onClick={() => setScanning(true)}>{joining ? t("joining") : t("scanCode")}</button>
+          {joinFailed ? <p className="px-1 text-xs text-neutral-500">{t("joinFailed")}</p> : null}
+        </div>
       ) : null}
     </div>
   )
@@ -208,12 +215,21 @@ function TrackRecord(props: { recording: boolean; onRecording: (value: boolean) 
   )
 }
 
-function DeviceName() {
+function DeviceName(props: { session: Session }) {
   const [name, setName] = useState(deviceLabel)
+  useEffect(() => {
+    void defaultDeviceName().then((next) => {
+      setName(next)
+      if (props.session.kind === "device" && next !== "Phone") void renameSelf(props.session, next)
+    })
+  }, [props.session])
   function save(value: string) {
     const next = value.trim() || "Phone"
     setName(next)
-    if (next !== deviceLabel()) rememberDeviceLabel(next)
+    if (next !== deviceLabel()) {
+      rememberDeviceLabel(next)
+      if (props.session.kind === "device") void renameSelf(props.session, next)
+    }
   }
   return (
     <form

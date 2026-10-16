@@ -59,11 +59,11 @@ export async function readDevices(session: Session): Promise<DeviceRow[]> {
   return body.devices ?? []
 }
 
-export async function createEnrollment(session: Session): Promise<{ code: string; expiresAt: string } | null> {
+export async function createEnrollment(session: Session): Promise<{ code: string; expiresAt: string; qrText: string } | null> {
   if (!session.projectId) return null
   const response = await fetch(`${session.server}/api/v1/projects/${session.projectId}/enrollments`, { method: "POST", headers: auth(session) })
   if (!response.ok) return null
-  return (await response.json()) as { code: string; expiresAt: string }
+  return (await response.json()) as { code: string; expiresAt: string; qrText: string }
 }
 
 export async function sendCommand(session: Session, deviceId: string, mode: "off" | "live" | "track" | "both"): Promise<boolean> {
@@ -81,6 +81,15 @@ export async function readSelfCommand(session: Session): Promise<SelfCommand | n
   const response = await fetch(`${session.server}/api/v1/projects/${session.projectId}/devices/self/command`, { headers: auth(session) })
   if (!response.ok) return null
   return (await response.json()) as SelfCommand
+}
+
+export async function renameSelf(session: Session, name: string): Promise<void> {
+  if (!session.projectId) return
+  await fetch(`${session.server}/api/v1/projects/${session.projectId}/devices/self/name`, {
+    method: "POST",
+    headers: auth(session),
+    body: JSON.stringify({ name }),
+  })
 }
 
 export async function reportSelf(session: Session, body: { commandId?: string; actual: string; result?: string; adopt?: boolean }): Promise<void> {

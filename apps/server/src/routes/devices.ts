@@ -5,7 +5,7 @@ import type { ServerConfig } from "../config.js"
 import type { AppDatabase } from "../db/open.js"
 import { apiError, invalidToken } from "../http.js"
 import { ackCommand, issueCommand, readSelfCommand } from "../services/commands.js"
-import { createEnrollment, listDevices, redeemEnrollment, removeDevice } from "../services/enrollment.js"
+import { createEnrollment, listDevices, redeemEnrollment, removeDevice, renameDevice } from "../services/enrollment.js"
 
 export function deviceRoutes(db: AppDatabase, config: ServerConfig): Hono<AppEnv> {
   const routes = new Hono<AppEnv>()
@@ -17,6 +17,17 @@ export function deviceRoutes(db: AppDatabase, config: ServerConfig): Hono<AppEnv
     const self = readSelfCommand(db, projectId, access.deviceId)
     if (!self) return invalidToken(c)
     return c.json(self)
+  })
+
+  routes.post("/api/v1/projects/:projectId/devices/self/name", async (c) => {
+    const projectId = c.req.param("projectId")
+    const access = accessFor(db, config, c.req.header("authorization"))
+    if (!canWriteProject(access, projectId) || access?.role !== "project" || access.kind !== "device" || !access.deviceId) return invalidToken(c)
+    const body = (await c.req.json().catch(() => null)) as { name?: unknown } | null
+    if (!body || typeof body.name !== "string" || !renameDevice(db, projectId, access.deviceId, body.name)) {
+      return apiError(c, 400, "validation", "Device name is required")
+    }
+    return c.json({ accepted: true })
   })
 
   routes.post("/api/v1/projects/:projectId/devices/self/command", async (c) => {

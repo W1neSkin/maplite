@@ -41,7 +41,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     throw new Error("ADMIN_TOKEN must be at least 43 characters when NODE_ENV=production")
   }
   const databasePath = env.DATABASE_PATH ?? "./data/cartography.sqlite"
-  const port = Number(env.PORT ?? 3847)
+  // SillyDev assigns SERVER_PORT. Enzonic and a local run use PORT.
+  const port = Number(env.SERVER_PORT || env.PORT || 3847)
   if (!Number.isInteger(port) || port < 1) throw new Error("PORT must be a positive integer")
   return {
     host: env.HOST ?? "0.0.0.0",

@@ -8,6 +8,8 @@ type SheetProps = {
   onRename?: (name: string) => void
   actions?: ReactNode
   footer?: ReactNode
+  /** Settings with an enrollment picture needs more than the usual half-screen sheet. */
+  tall?: boolean
   children: ReactNode
 }
 
@@ -33,7 +35,7 @@ export const Sheet = forwardRef<HTMLElement, SheetProps>(function Sheet(props, r
   }
 
   return (
-    <section ref={ref} className="pointer-events-auto absolute inset-x-3 bottom-[calc(84px+max(8px,env(safe-area-inset-bottom)))] z-20 flex max-h-[min(20rem,46%)] flex-col overflow-hidden rounded-2xl border border-black/10 bg-[var(--card)] text-[var(--foreground)] shadow-lg">
+    <section ref={ref} className={`pointer-events-auto absolute inset-x-3 bottom-[calc(84px+max(8px,env(safe-area-inset-bottom)))] z-20 flex flex-col overflow-hidden rounded-2xl border border-black/10 bg-[var(--card)] text-[var(--foreground)] shadow-lg ${props.tall ? "max-h-[min(40rem,82%)]" : "max-h-[min(20rem,46%)]"}`}>
       <header className="relative z-10 flex shrink-0 items-center gap-1 bg-[var(--card)] px-2 py-1">
         {editing ? (
           <form className="flex min-w-0 flex-1 items-center gap-1" onSubmit={save}>

@@ -40,15 +40,15 @@ export function createApp(db: AppDatabase, config: ServerConfig, options: { migr
     }
   })
 
-  // The browser is a different origin. same-origin CORP would block it even
-  // when the CORS allow list says yes.
-  app.use(
-    "*",
-    secureHeaders({
-      crossOriginResourcePolicy: "cross-origin",
-      contentSecurityPolicy: { defaultSrc: ["'none'"] },
-    }),
-  )
+  // API responses are not a document. The map page, when this process serves
+  // one, sets its own policy in site.ts. same-origin CORP would block a
+  // browser on another origin even when the CORS allow list says yes.
+  const apiHeaders = secureHeaders({
+    crossOriginResourcePolicy: "cross-origin",
+    contentSecurityPolicy: { defaultSrc: ["'none'"] },
+  })
+  app.use("/api/*", apiHeaders)
+  app.use("/health/*", apiHeaders)
   app.use("/api/*", rateLimit(240, 60_000))
   app.use(
     "/api/*",
