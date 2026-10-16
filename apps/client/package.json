@@ -11,6 +11,7 @@
     "preview": "vite preview --host 127.0.0.1 --port 3848"
   },
   "dependencies": {
+    "@capacitor/core": "^8.5.3",
     "@cartography/extension-api": "workspace:*",
     "@cartography/extension-example": "workspace:*",
     "@cartography/geo-core": "workspace:*",

@@ -1,7 +1,8 @@
 import { geodesicLength } from "@cartography/geo-core"
 import { createId } from "@cartography/project-schema"
 import { useEffect, useState } from "react"
-import { clientId, editOrigin, type Session } from "./connection.js"
+import { clientId, editOrigin, isPhoneApp, type Session } from "./connection.js"
+import { ShareLocation } from "../platform/share-location.js"
 import { publishLive, readLive, type LiveMessage } from "../sync/channel.js"
 import { watchChanges } from "../sync/api.js"
 
@@ -123,38 +124,53 @@ export function useLive(session: Session) {
   useEffect(() => {
     if (surface !== "device") return
     if (!sharing) {
+      void ShareLocation.stop().catch(() => {})
       void publishLive(session, { id: subjectId, fixId: createId(), sampledAt: new Date().toISOString(), body: { sharing: false, name: deviceLabel() } })
       return
     }
-    if (!navigator.geolocation) return
-    let last: { coordinate: [number, number]; accuracy: number | null; speed: number | null; course: number | null; sentAt: number } | null = null
-    const send = (coordinate: [number, number], accuracy: number | null, speed: number | null, course: number | null, sampledAt: string) => {
-      last = { coordinate, accuracy, speed, course, sentAt: Date.now() }
-      void publishLive(session, {
-        id: subjectId,
-        fixId: createId(),
-        sampledAt,
-        body: { name: deviceLabel(), sharing: true, longitude: coordinate[0], latitude: coordinate[1], horizontalAccuracyM: accuracy, speedMps: speed, courseDeg: course },
-      })
-    }
-    const watch = navigator.geolocation.watchPosition(
-      (position) => {
-        const coordinate: [number, number] = [position.coords.longitude, position.coords.latitude]
-        const accuracy = Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null
-        if (last && !movedEnough(last.coordinate, coordinate, accuracy) && Date.now() - last.sentAt < HEARTBEAT_MS) return
-        send(coordinate, accuracy, position.coords.speed, position.coords.heading, new Date(position.timestamp).toISOString())
-      },
-      () => {},
-      { enableHighAccuracy: true, maximumAge: 5000 },
-    )
-    const timer = window.setInterval(() => {
-      if (!last || Date.now() - last.sentAt < HEARTBEAT_MS) return
-      send(last.coordinate, last.accuracy, last.speed, last.course, new Date().toISOString())
-    }, 5000)
+    const handle: { watch: number | null; timer: number | null; native: boolean } = { watch: null, timer: null, native: false }
+    let cancel = false
+    void (async () => {
+      if (isPhoneApp() && session.projectId) {
+        try {
+          await ShareLocation.start({ server: session.server, token: session.token, projectId: session.projectId, subjectId, name: deviceLabel() })
+          handle.native = true
+        } catch {
+          handle.native = false
+        }
+      }
+      if (cancel || handle.native || !navigator.geolocation) return
+      let last: { coordinate: [number, number]; accuracy: number | null; speed: number | null; course: number | null; sentAt: number } | null = null
+      const send = (coordinate: [number, number], accuracy: number | null, speed: number | null, course: number | null, sampledAt: string) => {
+        last = { coordinate, accuracy, speed, course, sentAt: Date.now() }
+        void publishLive(session, {
+          id: subjectId,
+          fixId: createId(),
+          sampledAt,
+          body: { name: deviceLabel(), sharing: true, longitude: coordinate[0], latitude: coordinate[1], horizontalAccuracyM: accuracy, speedMps: speed, courseDeg: course },
+        })
+      }
+      handle.watch = navigator.geolocation.watchPosition(
+        (position) => {
+          const coordinate: [number, number] = [position.coords.longitude, position.coords.latitude]
+          const accuracy = Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null
+          if (last && !movedEnough(last.coordinate, coordinate, accuracy) && Date.now() - last.sentAt < HEARTBEAT_MS) return
+          send(coordinate, accuracy, position.coords.speed, position.coords.heading, new Date(position.timestamp).toISOString())
+        },
+        () => {},
+        { enableHighAccuracy: true, maximumAge: 5000 },
+      )
+      handle.timer = window.setInterval(() => {
+        if (!last || Date.now() - last.sentAt < HEARTBEAT_MS) return
+        send(last.coordinate, last.accuracy, last.speed, last.course, new Date().toISOString())
+      }, 5000)
+    })()
     return () => {
-      navigator.geolocation.clearWatch(watch)
-      window.clearInterval(timer)
-      void publishLive(session, { id: subjectId, fixId: createId(), sampledAt: new Date().toISOString(), body: { sharing: false, name: deviceLabel() } })
+      cancel = true
+      if (handle.watch != null) navigator.geolocation.clearWatch(handle.watch)
+      if (handle.timer != null) window.clearInterval(handle.timer)
+      void ShareLocation.stop().catch(() => {})
+      if (!handle.native) void publishLive(session, { id: subjectId, fixId: createId(), sampledAt: new Date().toISOString(), body: { sharing: false, name: deviceLabel() } })
     }
   }, [session, sharing, subjectId, surface])
 

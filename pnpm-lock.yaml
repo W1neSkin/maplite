@@ -29,6 +29,9 @@ importers:
 
   apps/client:
     dependencies:
+      '@capacitor/core':
+        specifier: ^8.5.3
+        version: 8.5.3
       '@cartography/extension-api':
         specifier: workspace:*
         version: link:../../packages/extension-api
@@ -108,6 +111,9 @@ importers:
       '@capacitor/ios':
         specifier: ^8.5.3
         version: 8.5.3(@capacitor/core@8.5.3)
+      '@cartography/share-location':
+        specifier: file:./plugins/share-location
+        version: file:apps/mobile/plugins/share-location
     devDependencies:
       '@capacitor/cli':
         specifier: ^8.5.3
@@ -194,6 +200,9 @@ packages:
     resolution: {integrity: sha512-HnnV92Jl8+3x0JUloXUMjFcUsQI8wHFVsKwkLn72DfRZXYGZW11tQbmNOWOnRTljaU18FdI1b9ipT09SzzPDNw==}
     peerDependencies:
       '@capacitor/core': ^8.5.0
+
+  '@cartography/share-location@file:apps/mobile/plugins/share-location':
+    resolution: {directory: apps/mobile/plugins/share-location, type: directory}
 
   '@esbuild/aix-ppc64@0.28.2':
     resolution: {integrity: sha512-XExcO+dvLKvVtNTibSTBej1NCAbaGhWn9Ww1ZPx80qsahhPFe/8jgWP0IchNe0F3HwkU7n8ejhH8bjonqht8mQ==}
@@ -2205,6 +2214,8 @@ snapshots:
   '@capacitor/ios@8.5.3(@capacitor/core@8.5.3)':
     dependencies:
       '@capacitor/core': 8.5.3
+
+  '@cartography/share-location@file:apps/mobile/plugins/share-location': {}
 
   '@esbuild/aix-ppc64@0.28.2':
     optional: true
