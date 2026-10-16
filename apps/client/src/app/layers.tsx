@@ -2,7 +2,7 @@ import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { t } from "../i18n/translate.js"
 import { measureLabel } from "./measure-label.js"
 import type { MapFeature, MapLayer } from "./model.js"
-import { CheckIcon, CloseIcon, ExportIcon, EyeIcon, EyeOffIcon, GeometryGlyph, GripIcon, IconButton, ImportIcon, PencilIcon, PinIcon, PlusIcon, SendIcon, TrashIcon } from "./icons.js"
+import { CheckIcon, CloseIcon, ControlIcon, ExportIcon, EyeIcon, EyeOffIcon, GeometryGlyph, GripIcon, GroupIcon, IconButton, ImportIcon, LayerIcon, PencilIcon, PinIcon, SendIcon, TrashIcon } from "./icons.js"
 import type { MapGroup } from "./model.js"
 import { FieldTools } from "./field-tools.js"
 
@@ -91,7 +91,7 @@ export function LayerBrowser(props: LayerBrowserProps) {
             <ImportIcon />
           </IconButton>
           <IconButton tone="fill" aria-label={t("controlPoints")} title={t("controlPoints")} onClick={props.onControls}>
-            <PlusIcon />
+            <ControlIcon />
           </IconButton>
           <NewGroup onCreate={props.onCreateGroup} />
           <NewLayer groups={props.groups} onCreate={props.onCreateLayer} />
@@ -222,7 +222,7 @@ function FeatureRow(props: { feature: MapFeature; selected: boolean; locked: boo
 function NewGroup(props: { onCreate: (name: string) => void }) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
-  if (!open) return <IconButton tone="fill" aria-label={t("newGroup")} title={t("newGroup")} onClick={() => setOpen(true)}><PlusIcon /></IconButton>
+  if (!open) return <IconButton tone="fill" aria-label={t("newGroup")} title={t("newGroup")} onClick={() => setOpen(true)}><GroupIcon /></IconButton>
   return (
     <form className="flex items-center gap-1" onSubmit={(event) => { event.preventDefault(); const next = name.trim(); if (!next) return; props.onCreate(next); setName(""); setOpen(false) }}>
       <input aria-label={t("groupName")} className="h-8 w-24 rounded-lg border border-[var(--border)] px-2 text-sm" value={name} autoFocus onChange={(event) => setName(event.target.value)} />
@@ -239,7 +239,7 @@ function NewLayer(props: { groups: readonly MapGroup[]; onCreate: (name: string,
   if (!open) {
     return (
       <IconButton tone="fill" aria-label={t("newLayer")} title={t("newLayer")} onClick={() => setOpen(true)}>
-        <PlusIcon />
+        <LayerIcon />
       </IconButton>
     )
   }

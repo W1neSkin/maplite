@@ -72,6 +72,37 @@ export function PlusIcon() {
   )
 }
 
+/** Survey mark. The plain plus was shared with new group and new layer. */
+export function ControlIcon() {
+  return (
+    <Glyph>
+      <circle cx="12" cy="12" r="3" />
+      <path d="M12 3v4" />
+      <path d="M12 17v4" />
+      <path d="M3 12h4" />
+      <path d="M17 12h4" />
+    </Glyph>
+  )
+}
+
+export function GroupIcon() {
+  return (
+    <Glyph>
+      <path d="M3 8h6l2 2h10v9H3Z" />
+    </Glyph>
+  )
+}
+
+export function LayerIcon() {
+  return (
+    <Glyph>
+      <path d="M12 4 3 8l9 4 9-4-9-4Z" />
+      <path d="m3 12 9 4 9-4" />
+      <path d="m3 16 9 4 9-4" />
+    </Glyph>
+  )
+}
+
 export function EyeIcon() {
   return (
     <Glyph>
