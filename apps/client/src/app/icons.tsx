@@ -116,6 +116,15 @@ export function UndoIcon() {
   )
 }
 
+export function RedoIcon() {
+  return (
+    <Glyph>
+      <path d="M15 14l5-5-5-5" />
+      <path d="M20 9H10a6 6 0 0 0 0 12h5" />
+    </Glyph>
+  )
+}
+
 export function FitIcon() {
   return (
     <Glyph>

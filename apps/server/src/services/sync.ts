@@ -157,12 +157,14 @@ function applyOne(db: AppDatabase, op: SyncOperation): OperationResult {
     return remember(db, op, { opId: op.opId, status: "applied", version: 1, changeSeq: seq })
   }
   if (!row) return remember(db, op, reject(op, "not_found", "Record was not found"))
-  // A tombstone stays a tombstone. A repeated delete of that version is a no-op.
+  // A new create does not revive a tombstone. An update at that version does: session undo.
   if (row.deleted === 1) {
     if (op.kind === "delete" && op.baseVersion === row.version) {
       return remember(db, op, { opId: op.opId, status: "applied", version: row.version, changeSeq: row.change_seq })
     }
-    return remember(db, op, { ...conflict(row), opId: op.opId })
+    if (op.kind !== "update" || op.baseVersion !== row.version) {
+      return remember(db, op, { ...conflict(row), opId: op.opId })
+    }
   }
   if (row.version !== op.baseVersion) return remember(db, op, { ...conflict(row), opId: op.opId })
   const seq = nextSeq(db, op.projectId)

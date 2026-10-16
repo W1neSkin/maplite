@@ -86,6 +86,21 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
 
   useEffect(() => setCoordEdit(false), [selectedId, placingLayerId])
 
+  useEffect(() => {
+    function onKey(event: KeyboardEvent) {
+      const target = event.target
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement) return
+      if (!event.ctrlKey && !event.metaKey) return
+      const key = event.key.toLowerCase()
+      if (key !== "z" && key !== "y") return
+      event.preventDefault()
+      if (key === "y" || event.shiftKey) project.redo()
+      else project.undo()
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [project])
+
   function markReveal(id: string) {
     setReveal((current) => ({ id, token: (current?.token ?? 0) + 1 }))
   }
@@ -300,7 +315,7 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
               onDelete={() => void project.deleteLayer(openLayer.id).then((ok) => { if (!ok) return; if (openLayerId === openLayer.id) setOpenLayerId(null); setSelectedId(null) })}
             />
           ) : null}
-          footer={<SyncActions lastSync={project.lastSync} onSync={syncNow} onFit={fitShown} fitLabel={t(openLayer ? "fitLayer" : "fitLayers")} onBack={onBack} onDisconnect={onDisconnect} />}
+          footer={<SyncActions lastSync={project.lastSync} onSync={syncNow} onFit={fitShown} fitLabel={t(openLayer ? "fitLayer" : "fitLayers")} canUndo={project.canUndo} canRedo={project.canRedo} onUndo={project.undo} onRedo={project.redo} onBack={onBack} onDisconnect={onDisconnect} />}
         >
           {outcome ? (
             <ImportBody

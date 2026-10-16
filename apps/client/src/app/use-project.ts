@@ -5,6 +5,7 @@ import { clientId, editOrigin, type Session } from "./connection.js"
 import { buildMapModel, type MapModel } from "./model.js"
 import { pushOps, readAll, readChanges, watchChanges } from "../sync/api.js"
 import { applyRemote } from "../sync/edits.js"
+import { historyStep, stampForNow, type HistoryStep } from "./undo.js"
 
 export type Conflict = { operation: SyncOperation; serverVersion: number; serverPayload: unknown; serverDeleted: boolean }
 
@@ -30,6 +31,9 @@ export function useProject(session: Session) {
   const [upgrade, setUpgrade] = useState(false)
   const [conflict, setConflict] = useState<Conflict | null>(null)
   const [lastSync, setLastSync] = useState<string | null>(null)
+  const [history, setHistory] = useState({ undo: 0, redo: 0 })
+  const undoStack = useRef<HistoryStep[]>([])
+  const redoStack = useRef<HistoryStep[]>([])
   const model: MapModel = buildMapModel(snapshotOf(docs))
 
   const pull = useCallback(async () => {
@@ -54,6 +58,9 @@ export function useProject(session: Session) {
         if (loaded.schemaVersion !== 1) setUpgrade(true)
         setDocs(loaded.entities)
         cursor.current = loaded.watermark
+        undoStack.current = []
+        redoStack.current = []
+        setHistory({ undo: 0, redo: 0 })
         setLastSync(new Date().toISOString())
       })
       .catch(() => {
@@ -77,8 +84,13 @@ export function useProject(session: Session) {
     }
   }, [pull, session])
 
-  async function sendMany(operations: SyncOperation[], atomic = false): Promise<boolean> {
+  function publishHistory() {
+    setHistory({ undo: undoStack.current.length, redo: redoStack.current.length })
+  }
+
+  async function sendMany(operations: SyncOperation[], atomic = false, track = true): Promise<boolean> {
     if (!session.projectId || operations.length === 0) return false
+    const step = track ? historyStep(docs, operations) : null
     const stamped = operations.map((operation) => ({ ...operation, origin: editOrigin() }))
     setFailed(false)
     try {
@@ -90,6 +102,11 @@ export function useProject(session: Session) {
         return false
       }
       if (response.results.some((result) => result.status === "rejected")) return false
+      if (step) {
+        undoStack.current.push(step)
+        redoStack.current = []
+        publishHistory()
+      }
       await pull()
       return true
     } catch (error) {
@@ -101,6 +118,19 @@ export function useProject(session: Session) {
 
   function send(operation: SyncOperation): Promise<boolean> {
     return sendMany([operation])
+  }
+
+  function play(direction: "undo" | "redo") {
+    const source = direction === "undo" ? undoStack : redoStack
+    const step = source.current.pop()
+    if (!step) return
+    void sendMany(stampForNow(docs, step[direction]), true, false).then((ok) => {
+      if (ok) {
+        const other = direction === "undo" ? redoStack : undoStack
+        other.current.push(step)
+      } else source.current.push(step)
+      publishHistory()
+    })
   }
 
   function versionOf(id: string): number {
@@ -237,5 +267,5 @@ export function useProject(session: Session) {
     return records
   }
 
-  return { model, loading, failed, setFailed, upgrade, conflict, setConflict, lastSync, pull, send, renameLayer, restyleLayer, deleteLayer, createPointLayer, createPoint, createFeature, renameFeature, deleteFeature, movePoint, updateGeometry, reorderLayers, importLayer, recordsIn }
+  return { model, loading, failed, setFailed, upgrade, conflict, setConflict, lastSync, pull, send, renameLayer, restyleLayer, deleteLayer, createPointLayer, createPoint, createFeature, renameFeature, deleteFeature, movePoint, updateGeometry, reorderLayers, importLayer, recordsIn, canUndo: history.undo > 0, canRedo: history.redo > 0, undo: () => play("undo"), redo: () => play("redo") }
 }

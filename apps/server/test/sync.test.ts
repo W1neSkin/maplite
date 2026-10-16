@@ -123,8 +123,12 @@ describe("sync", () => {
     const resurrect = pushOperations(db, projectId, { operations: [{ ...point, opId: createId() }] })
     expect(resurrect?.results[0]?.status).toBe("conflict")
     if (resurrect?.results[0]?.status === "conflict") expect(resurrect.results[0].serverDeleted).toBe(true)
+    const restored = pushOperations(db, projectId, {
+      operations: [{ ...point, opId: createId(), kind: "update", baseVersion: 2, payload: point.payload }],
+    })
+    expect(restored?.results[0]?.status).toBe("applied")
+    expect(readSnapshot(db, projectId, null, 50)?.entities.find((entity) => entity.entityId === featureId)?.deleted).toBe(false)
     const page = readSnapshot(db, projectId, null, 50)
-    expect(page?.entities.find((entity) => entity.entityId === featureId)?.deleted).toBe(true)
 
     const extra = pointOp(projectId, layerId, createId(), "Extra")
     const stale = { ...point, opId: createId(), kind: "update" as const, baseVersion: 1, payload: point.payload }
