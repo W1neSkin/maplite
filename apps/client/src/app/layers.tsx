@@ -211,7 +211,9 @@ export function LayerActions(props: { geometryType: MapLayer["geometryType"]; co
       <IconButton tone="fill" aria-label={t(props.geometryType === "Point" ? "addToLayer" : props.geometryType === "LineString" ? "drawLine" : "drawPolygon")} title={t(props.geometryType === "Point" ? "addToLayer" : props.geometryType === "LineString" ? "drawLine" : "drawPolygon")} onClick={props.onAdd}>
         {props.geometryType === "Point" ? <PinIcon /> : <GeometryGlyph type={props.geometryType} />}
       </IconButton>
-      <button type="button" aria-label={t("layerColor")} aria-pressed={props.styleOpen} title={t("layerColor")} className={props.styleOpen ? "h-8 w-8 shrink-0 rounded-full ring-2 ring-neutral-900 ring-offset-1" : "h-8 w-8 shrink-0 rounded-full"} style={{ backgroundColor: props.color }} onClick={props.onStyle} />
+      <IconButton tone="fill" aria-label={t("layerColor")} aria-pressed={props.styleOpen} title={t("layerColor")} onClick={props.onStyle}>
+        <span className={props.styleOpen ? "h-4 w-4 rounded-full ring-2 ring-neutral-900" : "h-4 w-4 rounded-full"} style={{ backgroundColor: props.color }} />
+      </IconButton>
       <IconButton tone="fill" aria-label={t("exportLayer")} title={t("exportLayer")} onClick={props.onExport}>
         <ExportIcon />
       </IconButton>
