@@ -24,6 +24,8 @@ export const messages = {
   insecureServer: "This page is HTTPS, but the server address is HTTP.",
   disconnect: "Disconnect",
   addPoint: "Add point",
+  measure: "Measure",
+  measureHint: "Tap the map to measure",
   myLocation: "My location",
   north: "North",
   crsWeb: "WGS",

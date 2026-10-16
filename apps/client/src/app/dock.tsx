@@ -1,16 +1,18 @@
 import { useState, type Ref } from "react"
 import { formatWhen } from "../i18n/format.js"
 import { t } from "../i18n/translate.js"
-import { BackIcon, CheckIcon, CloseIcon, DisconnectIcon, FitIcon, IconButton, LayersIcon, LocateIcon, PinIcon, RedoIcon, SyncIcon, UndoIcon } from "./icons.js"
+import { BackIcon, CheckIcon, CloseIcon, DisconnectIcon, FitIcon, IconButton, LayersIcon, LocateIcon, MeasureIcon, PinIcon, RedoIcon, SyncIcon, UndoIcon } from "./icons.js"
 
 export function MapDock(props: {
   dockRef: Ref<HTMLElement>
   layersOpen: boolean
   placing: boolean
+  measuring: boolean
   disabled: boolean
   locating: boolean
   onLayers: () => void
   onAdd: () => void
+  onMeasure: () => void
   onLocate: () => void
 }) {
   return (
@@ -21,10 +23,27 @@ export function MapDock(props: {
       <IconButton tone={props.placing ? "dockOn" : "dock"} aria-pressed={props.placing} aria-label={t("addPoint")} title={t("addPoint")} disabled={props.disabled} onClick={props.onAdd}>
         <PinIcon />
       </IconButton>
+      <IconButton tone={props.measuring ? "dockOn" : "dock"} aria-pressed={props.measuring} aria-label={t("measure")} title={t("measure")} disabled={props.disabled} onClick={props.onMeasure}>
+        <MeasureIcon />
+      </IconButton>
       <IconButton tone={props.locating ? "dockOn" : "dock"} aria-pressed={props.locating} aria-label={t("myLocation")} title={t("myLocation")} onClick={props.onLocate}>
         <LocateIcon />
       </IconButton>
     </nav>
+  )
+}
+
+export function MeasureBar(props: { label: string; canUndo: boolean; onUndo: () => void; onClose: () => void }) {
+  return (
+    <div role="status" className="absolute left-3 right-14 top-[max(8px,env(safe-area-inset-top))] z-20 flex items-center rounded-2xl bg-neutral-900 text-white shadow-lg">
+      <span className="min-w-0 flex-1 truncate px-3 text-sm">{props.label}</span>
+      <IconButton tone="inverse" aria-label={t("undoVertex")} title={t("undoVertex")} disabled={!props.canUndo} onClick={props.onUndo}>
+        <UndoIcon />
+      </IconButton>
+      <IconButton tone="inverse" aria-label={t("close")} title={t("close")} onClick={props.onClose}>
+        <CloseIcon />
+      </IconButton>
+    </div>
   )
 }
 

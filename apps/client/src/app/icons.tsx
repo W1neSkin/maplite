@@ -125,6 +125,17 @@ export function RedoIcon() {
   )
 }
 
+export function MeasureIcon() {
+  return (
+    <Glyph>
+      <path d="M4 20 20 4" />
+      <path d="m7 17 2 2" />
+      <path d="m11 13 2 2" />
+      <path d="m15 9 2 2" />
+    </Glyph>
+  )
+}
+
 export function CopyIcon() {
   return (
     <Glyph>

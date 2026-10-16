@@ -1,3 +1,4 @@
+import { geodesicLength } from "@cartography/geo-core"
 import { createId } from "@cartography/project-schema"
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import "../extensions.js"
@@ -11,11 +12,12 @@ import { copyOperation, overwriteOperation } from "../sync/edits.js"
 import { ConflictCard } from "./cards.js"
 import { type Session } from "./connection.js"
 import { CoordBar } from "./coords.js"
-import { MapDock, PlacingBar, SyncActions } from "./dock.js"
+import { MapDock, MeasureBar, PlacingBar, SyncActions } from "./dock.js"
 import { ImportBody } from "./import-sheet.js"
 import { loadBytes, type ImportOutcome } from "../import/load.js"
 import { saveZip } from "../import/save-zip.js"
 import { layerZip } from "../import/write-shp.js"
+import { formatLength } from "../i18n/format.js"
 import { t } from "../i18n/translate.js"
 import { LayerStyle } from "./layer-style.js"
 import { LayerActions, LayerBrowser } from "./layers.js"
@@ -62,6 +64,8 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
   const [placeName, setPlaceName] = useState("")
   const [vertices, setVertices] = useState<[number, number][]>([])
   const [styleOpen, setStyleOpen] = useState(false)
+  const [measuring, setMeasuring] = useState(false)
+  const [ruler, setRuler] = useState<[number, number][]>([])
   const placeNameTouched = useRef(false)
   const [reveal, setReveal] = useState<{ id: string; token: number } | null>(null)
   const [cursor, setCursor] = useState<[number, number] | null>(null)
@@ -124,7 +128,13 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
     setSheet(false)
   }
 
+  function stopMeasure() {
+    setMeasuring(false)
+    setRuler([])
+  }
+
   function beginAdd() {
+    stopMeasure()
     if (placingLayerId) {
       setPlacingLayerId(null)
       setVertices([])
@@ -157,6 +167,19 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
     if (feature) setOpenLayerId(feature.layerId)
     setSheet(true)
     markReveal(id)
+  }
+
+  function toggleMeasure() {
+    if (measuring) {
+      stopMeasure()
+      return
+    }
+    setPlacingLayerId(null)
+    setVertices([])
+    setSheet(false)
+    setSelectedId(null)
+    setMeasuring(true)
+    setRuler([])
   }
 
   async function placeAt(coordinate: [number, number]) {
@@ -251,7 +274,8 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
       if (candidate && !candidate.outside) usable.push(item)
     }
   }
-  const callout = selected && !placingLayerId && !hidden.has(selected.layerId)
+  const rulerLabel = ruler.length >= 2 ? t("featureLength", { value: formatLength(geodesicLength(ruler)) }) : t("measureHint")
+  const callout = selected && !placingLayerId && !measuring && !hidden.has(selected.layerId)
     ? { coordinate: anchorOf(selected.geometry), title: selected.name, layer: project.model.layers.find((layer) => layer.id === selected.layerId)?.name ?? "" }
     : null
 
@@ -261,18 +285,29 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
         ref={mapRef}
         features={project.model.features.filter((feature) => !hidden.has(feature.layerId))}
         selectedId={selectedId}
-        placing={placingLayerId !== null}
+        placing={placingLayerId !== null || measuring}
         callout={callout}
-        draft={placingLayer && placingLayer.geometryType !== "Point" && vertices.length > 0 ? { type: placingLayer.geometryType, coordinates: vertices } : null}
+        draft={measuring && ruler.length > 0 ? { type: "LineString", coordinates: ruler } : placingLayer && placingLayer.geometryType !== "Point" && vertices.length > 0 ? { type: placingLayer.geometryType, coordinates: vertices } : null}
         projectionId={activeProfile?.id ?? null}
         onBasemapFailed={setBasemapFailed}
         onCenter={setMapCenter}
-        onPlace={(coordinate) => { setCursor(coordinate); void placeAt(coordinate) }}
+        onPlace={(coordinate) => {
+          const rounded: [number, number] = [Number(coordinate[0].toFixed(6)), Number(coordinate[1].toFixed(6))]
+          setCursor(rounded)
+          if (measuring) {
+            setRuler((current) => [...current, rounded])
+            return
+          }
+          void placeAt(rounded)
+        }}
         onCursor={setCursor}
         onLocated={setCursor}
         onSelect={(id) => { if (id) selectFeature(id); else setSelectedId(null) }}
         onGeometry={(id, geometry) => project.updateGeometry(id, geometry)}
       />
+      {measuring ? (
+        <MeasureBar label={rulerLabel} canUndo={ruler.length > 0} onUndo={() => setRuler((current) => current.slice(0, -1))} onClose={stopMeasure} />
+      ) : null}
       {placingLayer ? (
         <PlacingBar
           name={placeName}
@@ -422,10 +457,12 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
         dockRef={dockRef}
         layersOpen={sheet && !placingLayerId}
         placing={placingLayerId !== null}
+        measuring={measuring}
         locating={locating}
         disabled={project.failed || project.loading}
-        onLayers={() => { setPlacingLayerId(null); setSheet((current) => !current) }}
+        onLayers={() => { setPlacingLayerId(null); stopMeasure(); setSheet((current) => !current) }}
         onAdd={beginAdd}
+        onMeasure={toggleMeasure}
         onLocate={() => void locate()}
       />
     </div>
