@@ -61,6 +61,26 @@ body {
   margin-top: 4px;
 }
 
+.map-north {
+  position: absolute;
+  z-index: 1;
+  right: max(8px, env(safe-area-inset-right));
+  top: calc(max(8px, env(safe-area-inset-top)) + 76px);
+  display: grid;
+  width: 32px;
+  height: 32px;
+  place-items: center;
+  border: 1px solid rgb(0 0 0 / 10%);
+  border-radius: 999px;
+  background: #fff;
+  box-shadow: 0 1px 4px rgb(0 0 0 / 16%);
+}
+
+.map-north-arrow {
+  display: grid;
+  place-items: center;
+}
+
 .ol-attribution {
   font-size: 11px;
   max-width: 46%;

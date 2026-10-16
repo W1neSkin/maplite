@@ -28,6 +28,8 @@ function measurePadding(stage: HTMLElement, sheet: HTMLElement, dock: HTMLElemen
   if (coord) overlays.push(boxOf(coord.getBoundingClientRect()))
   const zoom = stage.querySelector(".ol-zoom")
   if (zoom instanceof HTMLElement) overlays.push(boxOf(zoom.getBoundingClientRect()))
+  const north = stage.querySelector(".map-north")
+  if (north instanceof HTMLElement) overlays.push(boxOf(north.getBoundingClientRect()))
   return paddingFromOverlays(boxOf(stage.getBoundingClientRect()), overlays)
 }
 

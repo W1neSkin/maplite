@@ -22,6 +22,7 @@ export const messages = {
   disconnect: "Disconnect",
   addPoint: "Add point",
   myLocation: "My location",
+  north: "North",
   locationOff: "Location is turned off",
   longitude: "Longitude",
   latitude: "Latitude",

@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useLayoutEffect, useRef } from "react"
+import { forwardRef, useImperativeHandle, useLayoutEffect, useRef, useState } from "react"
 import Map from "ol/Map"
 import View from "ol/View"
 import Attribution from "ol/control/Attribution"
@@ -116,6 +116,7 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
   const placingRef = useRef(placing)
   const didFit = useRef(false)
   const hasHere = useRef(false)
+  const [rotation, setRotation] = useState(0)
   selectRef.current = onSelect
   placeRef.current = onPlace
   cursorRef.current = onCursor
@@ -181,6 +182,8 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
       selectRef.current?.(found)
     }
     map.on("singleclick", onClick)
+    const onRotate = () => setRotation(map.getView().getRotation())
+    map.getView().on("change:rotation", onRotate)
     void readPosition()
       .then((coordinate) => {
         if (mapRef.current !== map) return
@@ -193,6 +196,7 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
       .catch(() => {})
     return () => {
       map.un("singleclick", onClick)
+      map.getView().un("change:rotation", onRotate)
       tiles.un("tileloaderror", onError)
       tiles.un("tileloadend", onLoad)
       map.setTarget(undefined)
@@ -264,5 +268,17 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
     },
   }), [])
 
-  return <div ref={target} className={placing ? "map-root map-placing" : "map-root"} aria-label={t("mapLabel")} />
+  return (
+    <div className="relative h-full w-full">
+      <div ref={target} className={placing ? "map-root map-placing" : "map-root"} aria-label={t("mapLabel")} />
+      <button type="button" className="map-north" aria-label={t("north")} title={t("north")} onClick={() => mapRef.current?.getView().animate({ rotation: 0, duration: 200 })}>
+        <span className="map-north-arrow" style={{ transform: `rotate(${-rotation}rad)` }}>
+          <svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true">
+            <path d="M12 3 16 14 12 12 8 14Z" fill="#dc2626" />
+            <path d="M12 21 8 10 12 12 16 10Z" fill="#111827" />
+          </svg>
+        </span>
+      </button>
+    </div>
+  )
 })
