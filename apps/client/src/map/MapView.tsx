@@ -250,7 +250,6 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
       center: moved,
       resolution,
       rotation: rotationNow,
-      wrapX: next === "EPSG:3857",
       extent: next === "EPSG:3857" ? undefined : getProjection(next)?.getExtent(),
     }))
     const fix = hereLonLat.current
