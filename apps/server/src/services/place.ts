@@ -1,13 +1,13 @@
-const LOCALITY = ["city", "town", "village", "municipality", "hamlet", "county", "state"] as const
+const LOCALITY = ["city", "town", "village", "municipality", "hamlet"] as const
 
-/** City and country only, so the phone coordinate bar stays one short line. */
+/** Settlement name only. The country makes the phone bar overflow. */
 export function placeLabel(address: Record<string, unknown> | null | undefined): string {
   if (!address) return ""
   const text = (key: string) => (typeof address[key] === "string" ? address[key].trim() : "")
-  const locality = LOCALITY.map(text).find(Boolean) ?? ""
-  const country = text("country")
-  if (locality && country && locality !== country) return `${locality}, ${country}`
-  return locality || country
+  const locality = LOCALITY.map(text).find(Boolean)
+  if (locality) return locality
+  const code = text("country_code").toUpperCase()
+  return code || text("country")
 }
 
 const cache = new Map<string, { label: string; at: number }>()
