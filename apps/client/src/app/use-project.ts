@@ -1,4 +1,4 @@
-import { createId, type Feature, type JsonValue, type Layer, type SnapshotEntity, type SyncOperation } from "@cartography/project-schema"
+import { createId, type ControlPoint, type Feature, type JsonValue, type Layer, type LayerGroup, type SnapshotEntity, type SyncOperation } from "@cartography/project-schema"
 import type { ImportReady } from "../import/load.js"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { clientId, editOrigin, type Session } from "./connection.js"
@@ -160,13 +160,13 @@ export function useProject(session: Session) {
     return send({ opId: createId(), clientId: clientId(), projectId: session.projectId, entityType: "layer", entityId: id, kind: "delete", baseVersion: versionOf(id) })
   }
 
-  async function createPointLayer(name: string, geometryType: Layer["geometryType"] = "Point"): Promise<string | null> {
+  async function createPointLayer(name: string, geometryType: Layer["geometryType"] = "Point", groupId: string | null = null): Promise<string | null> {
     if (!session.projectId) return null
     const id = createId()
     const payload: Layer = {
       id,
       projectId: session.projectId,
-      groupId: null,
+      groupId,
       name,
       geometryType,
       style: { color: "#2563eb", fillOpacity: geometryType === "Polygon" ? 0.28 : 0, strokeWidth: 2, labelAttribute: null },
@@ -258,6 +258,53 @@ export function useProject(session: Session) {
     return ok ? layerId : null
   }
 
+  async function createGroup(name: string): Promise<string | null> {
+    if (!session.projectId) return null
+    const id = createId()
+    const payload: LayerGroup = { id, projectId: session.projectId, name, order: model.groups.length }
+    const ok = await send({ opId: createId(), clientId: clientId(), projectId: session.projectId, entityType: "layerGroup", entityId: id, kind: "create", baseVersion: null, payload })
+    return ok ? id : null
+  }
+
+  function setLayerGroup(id: string, groupId: string | null) {
+    const layer = layerOf(docs, id)
+    if (!layer || layer.groupId === groupId || !session.projectId) return
+    void send({ opId: createId(), clientId: clientId(), projectId: session.projectId, entityType: "layer", entityId: id, kind: "update", baseVersion: versionOf(id), payload: { ...layer, groupId } })
+  }
+
+  function addControlPoint(input: { x: number; y: number; easting: number; northing: number }) {
+    if (!session.projectId) return
+    const projectId = session.projectId
+    const existing = docs.find((item) => item.entityType === "controlNetwork" && !item.deleted)
+    const networkId = existing?.entityId ?? createId()
+    const operations: SyncOperation[] = []
+    if (!existing) {
+      operations.push({ opId: createId(), clientId: clientId(), projectId, entityType: "controlNetwork", entityId: networkId, kind: "create", baseVersion: null, payload: { id: networkId, projectId, name: "Local", targetCrsProfileId: "local", version: 1, tx: null, ty: null, scale: null, rotationRad: null, ppm: null, rmsM: null, maxResidualM: null } })
+    }
+    const id = createId()
+    const count = docs.filter((item) => item.entityType === "controlPoint" && !item.deleted).length + 1
+    const payload: ControlPoint = { id, projectId, networkId, name: `CP ${count}`, x: input.x, y: input.y, easting: input.easting, northing: input.northing, weight: 1, role: "fit", source: "map", note: "" }
+    operations.push({ opId: createId(), clientId: clientId(), projectId, entityType: "controlPoint", entityId: id, kind: "create", baseVersion: null, payload })
+    void sendMany(operations, true)
+  }
+
+  function deleteControlPoint(id: string) {
+    if (!session.projectId) return
+    void send({ opId: createId(), clientId: clientId(), projectId: session.projectId, entityType: "controlPoint", entityId: id, kind: "delete", baseVersion: versionOf(id) })
+  }
+
+  function seatFeatures(updates: readonly { id: string; geometry: Feature["geometry"] }[]) {
+    if (!session.projectId) return
+    const operations: SyncOperation[] = []
+    for (const update of updates) {
+      const feature = featureOf(docs, update.id)
+      if (!feature) continue
+      const sourceGeometry = feature.sourceGeometry ?? { coordinates: feature.geometry as unknown as JsonValue, crsProfileId: "local" }
+      operations.push({ opId: createId(), clientId: clientId(), projectId: session.projectId, entityType: "feature", entityId: update.id, kind: "update", baseVersion: versionOf(update.id), payload: { ...feature, geometry: update.geometry, sourceGeometry } })
+    }
+    void sendMany(operations)
+  }
+
   function recordsIn(layerId: string): Feature[] {
     const records: Feature[] = []
     for (const item of docs) {
@@ -268,5 +315,6 @@ export function useProject(session: Session) {
     return records
   }
 
-  return { model, loading, failed, setFailed, upgrade, conflict, setConflict, lastSync, pull, send, renameLayer, restyleLayer, deleteLayer, createPointLayer, createPoint, createFeature, renameFeature, deleteFeature, movePoint, updateGeometry, reorderLayers, importLayer, recordsIn, canUndo: history.undo > 0, canRedo: history.redo > 0, undo: () => play("undo"), redo: () => play("redo") }
+  const controlPoints = docs.filter((item) => item.entityType === "controlPoint" && !item.deleted).map((item) => item.payload as ControlPoint)
+  return { model, loading, failed, setFailed, upgrade, conflict, setConflict, lastSync, pull, send, renameLayer, restyleLayer, deleteLayer, createPointLayer, createGroup, setLayerGroup, createPoint, createFeature, renameFeature, deleteFeature, movePoint, updateGeometry, reorderLayers, importLayer, recordsIn, controlPoints, addControlPoint, deleteControlPoint, seatFeatures, canUndo: history.undo > 0, canRedo: history.redo > 0, undo: () => play("undo"), redo: () => play("redo") }
 }

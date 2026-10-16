@@ -1,4 +1,4 @@
-import { geodesicLength } from "@cartography/geo-core"
+import { averagePositions, geodesicLength, solveSimilarity } from "@cartography/geo-core"
 import { createId } from "@cartography/project-schema"
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import "../extensions.js"
@@ -7,9 +7,13 @@ import { readDisplayDatum, writeDisplayDatum, zoneProfile, type DisplayDatum } f
 import { MapView, type MapHandle } from "../map/MapView.js"
 import { ensureProjection } from "../map/register-crs.js"
 import { featureBounds } from "../map/bounds.js"
+import { groundOf, seatGeometry } from "../map/seat.js"
 import { paddingFromOverlays, type ScreenBox } from "../map/frame.js"
 import { copyOperation, overwriteOperation } from "../sync/edits.js"
 import { ConflictCard } from "./cards.js"
+import { ControlPanel } from "./control-panel.js"
+import { collectFixes } from "./field.js"
+import { Legend } from "./legend.js"
 import { type Session } from "./connection.js"
 import { CoordBar } from "./coords.js"
 import { MapDock, MeasureBar, PlacingBar, SyncActions } from "./dock.js"
@@ -21,7 +25,7 @@ import { formatLength } from "../i18n/format.js"
 import { t } from "../i18n/translate.js"
 import { labelFields, LayerStyle } from "./layer-style.js"
 import { LayerActions, LayerBrowser } from "./layers.js"
-import { moveItem } from "./order.js"
+import { groupedIds } from "./order.js"
 import { Sheet } from "./Sheet.js"
 import { useProject } from "./use-project.js"
 import { readHidden, writeHidden } from "./view-state.js"
@@ -66,6 +70,10 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
   const [styleOpen, setStyleOpen] = useState(false)
   const [measuring, setMeasuring] = useState(false)
   const [ruler, setRuler] = useState<[number, number][]>([])
+  const [controlsOpen, setControlsOpen] = useState(false)
+  const [controlPick, setControlPick] = useState(false)
+  const [controlDraft, setControlDraft] = useState<[number, number] | null>(null)
+  const [fieldBusy, setFieldBusy] = useState(false)
   const placeNameTouched = useRef(false)
   const [reveal, setReveal] = useState<{ id: string; token: number } | null>(null)
   const [cursor, setCursor] = useState<[number, number] | null>(null)
@@ -253,6 +261,38 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
     else setCursor(coordinate)
   }
 
+  async function markHere() {
+    if (!openLayer || openLayer.geometryType !== "Point") return
+    const coordinate = (await mapRef.current?.locate()) ?? null
+    if (!coordinate) { setLocationOff(true); return }
+    const count = project.model.features.filter((feature) => feature.layerId === openLayer.id).length
+    await project.createPoint(openLayer.id, coordinate, t("markHere") + " " + (count + 1))
+  }
+
+  async function averageHere() {
+    if (!openLayer || openLayer.geometryType !== "Point") return
+    setFieldBusy(true)
+    const fixes = await collectFixes()
+    setFieldBusy(false)
+    const result = averagePositions(fixes)
+    if (!result) { setLocationOff(true); return }
+    const count = project.model.features.filter((feature) => feature.layerId === openLayer.id).length
+    await project.createPoint(openLayer.id, [result.coordinate[0], result.coordinate[1]], t("averageHere") + " " + (count + 1))
+  }
+
+  async function buildShape(kind: "LineString" | "Polygon") {
+    if (!openLayer) return
+    const points = project.model.features.filter((feature) => feature.layerId === openLayer.id && feature.geometry.type === "Point")
+    if (kind === "LineString" && points.length < 2) return
+    if (kind === "Polygon" && points.length < 3) return
+    const coordinates = points.flatMap((feature) => feature.geometry.type === "Point" ? [feature.geometry.coordinates] : [])
+    const id = await project.createPointLayer(`${openLayer.name} ${kind === "LineString" ? "line" : "area"}`, kind, openLayer.groupId)
+    if (!id) return
+    const geometry = kind === "LineString" ? { type: "LineString" as const, coordinates } : { type: "Polygon" as const, coordinates: [[...coordinates, coordinates[0]!]] }
+    await project.createFeature(id, geometry, openLayer.name)
+    setOpenLayerId(id)
+  }
+
   async function readImport(file: File) {
     const bytes = new Uint8Array(await file.arrayBuffer())
     zipRef.current = bytes
@@ -266,6 +306,15 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
   const coordValue = !placingLayerId && selectedPoint ? selectedPoint : cursor
   const zone = datum !== "web" && mapCenter ? zoneProfile(datum, mapCenter[0], mapCenter[1]) : null
   const activeProfile = zone && !zone.outside ? zone.profile : null
+  const controlFit = (() => {
+    if (project.controlPoints.length < 1) return null
+    try {
+      const solution = solveSimilarity(project.controlPoints.map((point) => ({ id: point.id, x: point.x, y: point.y, easting: point.easting, northing: point.northing, role: "fit" as const })))
+      return { similarity: solution.similarity, rms: t("controlRms", { rms: solution.rmsM.toFixed(2) }) }
+    } catch {
+      return null
+    }
+  })()
   if (activeProfile) ensureProjection(activeProfile)
   const usable: DisplayDatum[] = ["web"]
   if (mapCenter) {
@@ -281,11 +330,12 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
 
   return (
     <div ref={stageRef} className="relative h-full">
+      <Legend layers={project.model.layers} hidden={hidden} />
       <MapView
         ref={mapRef}
         features={project.model.features.filter((feature) => !hidden.has(feature.layerId))}
         selectedId={selectedId}
-        placing={placingLayerId !== null || measuring}
+        placing={placingLayerId !== null || measuring || controlPick}
         callout={callout}
         draft={measuring && ruler.length > 0 ? { type: "LineString", coordinates: ruler } : placingLayer && placingLayer.geometryType !== "Point" && vertices.length > 0 ? { type: placingLayer.geometryType, coordinates: vertices } : null}
         projectionId={activeProfile?.id ?? null}
@@ -294,6 +344,12 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
         onPlace={(coordinate) => {
           const rounded: [number, number] = [Number(coordinate[0].toFixed(6)), Number(coordinate[1].toFixed(6))]
           setCursor(rounded)
+          if (controlPick) {
+            setControlDraft(rounded)
+            setControlPick(false)
+            setSheet(true)
+            return
+          }
           if (measuring) {
             setRuler((current) => [...current, rounded])
             return
@@ -333,7 +389,7 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
       {sheet && !placingLayerId ? (
         <Sheet
           ref={sheetRef}
-          title={outcome ? t("importData") : openLayer ? openLayer.name : t("layersTitle")}
+          title={outcome ? t("importData") : controlsOpen ? t("controlPoints") : openLayer ? openLayer.name : t("layersTitle")}
           onClose={() => { if (outcome) { setOutcome(null); return }; if (openLayerId) setOpenLayerId(null); else setSheet(false) }}
           onRename={!outcome && openLayer ? (name) => void project.renameLayer(openLayer.id, name) : undefined}
           actions={!outcome && openLayer ? (
@@ -352,7 +408,29 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
           ) : null}
           footer={<SyncActions lastSync={project.lastSync} onSync={syncNow} onFit={fitShown} fitLabel={t(openLayer ? "fitLayer" : "fitLayers")} canUndo={project.canUndo} canRedo={project.canRedo} onUndo={project.undo} onRedo={project.redo} onBack={onBack} onDisconnect={onDisconnect} />}
         >
-          {outcome ? (
+          {controlsOpen && !outcome ? (
+            <ControlPanel
+              points={project.controlPoints}
+              rms={controlFit?.rms ?? null}
+              picking={controlPick}
+              draft={controlDraft}
+              canPlace={Boolean(openLayer && controlFit)}
+              onPick={() => { setControlPick(true); setSheet(false) }}
+              onSave={(x, y) => { if (!controlDraft) return; const [easting, northing] = groundOf(controlDraft, activeProfile); project.addControlPoint({ x, y, easting, northing }); setControlDraft(null) }}
+              onCancel={() => setControlDraft(null)}
+              onDelete={project.deleteControlPoint}
+              onPlace={() => {
+                if (!openLayer || !controlFit) return
+                const updates = project.recordsIn(openLayer.id).map((feature) => {
+                  const stored = feature.sourceGeometry?.coordinates
+                  const local = stored && typeof stored === "object" && stored !== null && "type" in stored ? stored as typeof feature.geometry : feature.geometry
+                  return { id: feature.id, geometry: seatGeometry(local, controlFit.similarity, activeProfile) }
+                })
+                project.seatFeatures(updates)
+              }}
+              onClose={() => { setControlsOpen(false); setControlPick(false); setControlDraft(null) }}
+            />
+          ) : outcome ? (
             <ImportBody
               outcome={outcome}
               onChoose={(name) => { const bytes = zipRef.current; if (bytes) setOutcome(loadBytes("archive.zip", bytes, { only: name })) }}
@@ -386,6 +464,7 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
           ) : null}
           <LayerBrowser
             layers={project.model.layers}
+            groups={project.model.groups}
             features={project.model.features}
             openLayerId={openLayerId}
             selectedId={selectedId}
@@ -393,20 +472,25 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
             onSelectFeature={selectFeature}
             onRenameFeature={project.renameFeature}
             onDeleteFeature={(id) => { project.deleteFeature(id); setSelectedId(null) }}
-            onCreateLayer={(name, geometryType) => void project.createPointLayer(name, geometryType).then((id) => {
+            onCreateLayer={(name, geometryType, groupId) => void project.createPointLayer(name, geometryType, groupId).then((id) => {
               if (!id) return
               placeNameTouched.current = false
               const key = geometryType === "LineString" ? "defaultLineName" : geometryType === "Polygon" ? "defaultPolygonName" : "defaultPointName"
               setPlaceName(t(key, { n: 1 }))
               startPlacing(id)
             })}
+            onCreateGroup={(name) => void project.createGroup(name)}
+            onSetGroup={project.setLayerGroup}
             hidden={hidden}
             onToggleVisible={toggleHidden}
-            onReorder={(from, to) => {
-              const ids = moveItem(project.model.layers.map((layer) => layer.id), from, to)
-              project.reorderLayers(ids)
-            }}
+            onReorder={(groupId, from, to) => project.reorderLayers(groupedIds(project.model.layers, project.model.groups, groupId, from, to))}
             onImport={() => fileRef.current?.click()}
+            onControls={() => setControlsOpen(true)}
+            fieldBusy={fieldBusy}
+            onMark={() => void markHere()}
+            onAverage={() => void averageHere()}
+            onBuildLine={() => void buildShape("LineString")}
+            onBuildPolygon={() => void buildShape("Polygon")}
           />
           </>
           )}

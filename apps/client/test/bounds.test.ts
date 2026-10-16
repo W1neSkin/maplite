@@ -3,7 +3,7 @@ import { featureBounds } from "../src/map/bounds.js"
 import type { MapFeature } from "../src/app/model.js"
 
 function feature(geometry: MapFeature["geometry"]): MapFeature {
-  return { id: "a", name: "A", layerId: "l", geometry, color: "#000", fillOpacity: 0, strokeWidth: 2, stack: 0, label: null }
+  return { id: "a", name: "A", layerId: "l", geometry, color: "#000", fillOpacity: 0, strokeWidth: 2, stack: 0, label: null, properties: {} }
 }
 
 describe("feature bounds", () => {

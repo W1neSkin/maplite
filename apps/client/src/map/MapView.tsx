@@ -7,6 +7,10 @@ import GeoJSON from "ol/format/GeoJSON"
 import Overlay from "ol/Overlay"
 import TileLayer from "ol/layer/Tile"
 import VectorLayer from "ol/layer/Vector"
+import Fill from "ol/style/Fill"
+import Stroke from "ol/style/Stroke"
+import Style from "ol/style/Style"
+import Text from "ol/style/Text"
 import { fromLonLat, get as getProjection, transform } from "ol/proj"
 import OSM from "ol/source/OSM"
 import VectorSource from "ol/source/Vector"
@@ -15,6 +19,7 @@ import type { MapFeature } from "../app/model.js"
 import { DEV_BASEMAP_URL } from "./basemap.js"
 import { FRAME_MARGIN, extentToScreen, frameFeature, panToCenterDelta } from "./frame.js"
 import { HERE_ZOOM, hereStyle, placeHere, readPosition } from "./here.js"
+import { updateKmGrid } from "./km-grid.js"
 import { featureStyle, paintFeature } from "./style.js"
 import { attachVertexEdit } from "./vertex-edit.js"
 
@@ -149,6 +154,7 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
     if (!element) return
     const tiles = new OSM({ url: DEV_BASEMAP_URL, attributions: "© OpenStreetMap contributors", crossOrigin: "anonymous" })
     const vectors = new VectorSource()
+    const grid = new VectorSource()
     const here = new VectorSource()
     const hereLayer = new VectorLayer({ source: here, style: hereStyle() })
     hereLayer.set("kind", "here")
@@ -158,7 +164,13 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
     const map = new Map({
       target: element,
       controls: [new Zoom(), new Attribution({ collapsible: false })],
-      layers: [new TileLayer({ source: tiles }), new VectorLayer({ source: vectors, style: featureStyle }), hereLayer],
+      layers: [new TileLayer({ source: tiles }), new VectorLayer({
+        source: grid,
+        style: (feature) => new Style({
+          stroke: new Stroke({ color: "rgba(17,24,39,0.28)", width: 1 }),
+          text: new Text({ text: String(feature.get("label") ?? ""), font: "11px sans-serif", fill: new Fill({ color: "#111827" }), stroke: new Stroke({ color: "#ffffff", width: 3 }), placement: "line" }),
+        }),
+      }), new VectorLayer({ source: vectors, style: featureStyle }), hereLayer],
       view: new View({ center: fromLonLat([-0.166, 51.507]), zoom: 13 }),
     })
     map.addOverlay(bubbleOverlay)
@@ -206,6 +218,8 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
     map.getView().on("change:rotation", onRotate)
     const onMove = () => {
       const center = map.getView().getCenter()
+      const size = map.getSize()
+      if (size) updateKmGrid(grid, map.getView().getProjection().getCode(), map.getView().calculateExtent(size))
       if (!center) return
       centerRef.current?.(lonLatFromView(map, center))
     }
@@ -281,7 +295,7 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
         : draft.type === "Polygon" && draft.coordinates.length >= 3
           ? { type: "Polygon" as const, coordinates: [[...draft.coordinates, draft.coordinates[0]!]] }
           : { type: "LineString" as const, coordinates: draft.coordinates }
-      const sketch = toOlFeature({ id: "draft", name: "", layerId: "", geometry, color: "#2563eb", fillOpacity: 0.15, strokeWidth: 2, stack: 200000, label: null }, false, projection)
+      const sketch = toOlFeature({ id: "draft", name: "", layerId: "", geometry, color: "#2563eb", fillOpacity: 0.15, strokeWidth: 2, stack: 200000, label: null, properties: {} }, false, projection)
       sketch.setId(undefined)
       sketch.set("draft", true)
       source.addFeature(sketch)
