@@ -5,6 +5,7 @@ import "../extensions.js"
 import { anchorOf } from "../map/anchor.js"
 import { readDisplayDatum, writeDisplayDatum, zoneProfile, type DisplayDatum } from "../map/display-crs.js"
 import { MapView, type MapHandle } from "../map/MapView.js"
+import type { HereFix } from "../map/here.js"
 import { ensureProjection } from "../map/register-crs.js"
 import { featureBounds } from "../map/bounds.js"
 import { groundOf, seatGeometry } from "../map/seat.js"
@@ -16,6 +17,7 @@ import { editOrigin, type Session } from "./connection.js"
 import { ControlPanel } from "./control-panel.js"
 import { DevicesPanel } from "./devices-panel.js"
 import { collectFixes } from "./field.js"
+import { isPrecise, type PositionProblem } from "../map/position.js"
 import { Legend } from "./legend.js"
 import { CoordBar } from "./coords.js"
 import { MapDock, MeasureBar, PlacingBar, SyncActions } from "./dock.js"
@@ -75,7 +77,7 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
   const dockRef = useRef<HTMLElement>(null)
   const coordRef = useRef<HTMLElement>(null)
   const [basemapFailed, setBasemapFailed] = useState(false)
-  const [locationOff, setLocationOff] = useState(false)
+  const [locationProblem, setLocationProblem] = useState<PositionProblem | "coarse" | null>(null)
   const [locating, setLocating] = useState(false)
   const [selectedId, setSelectedId] = useState<string | null>(null)
   const [liveId, setLiveId] = useState<string | null>(null)
@@ -104,7 +106,7 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
   const [mapCenter, setMapCenter] = useState<[number, number] | null>(null)
   const fileRef = useRef<HTMLInputElement>(null)
   const zipRef = useRef<Uint8Array | null>(null)
-  const status = project.upgrade ? t("upgradeRequired") : project.pending > 0 ? t("pendingChanges", { count: project.pending }) : project.failed ? t("serverUnavailable") : basemapFailed ? t("basemapUnavailable") : locationOff ? t("locationOff") : null
+  const status = project.upgrade ? t("upgradeRequired") : project.pending > 0 ? t("pendingChanges", { count: project.pending }) : project.failed ? t("serverUnavailable") : basemapFailed ? t("basemapUnavailable") : locationProblem === "denied" ? t("locationDenied") : locationProblem === "coarse" ? t("locationCoarse") : locationProblem === "waiting" ? t("locationWaiting") : null
   const shownLayers = project.model.layers.filter((layer) => showsLayer(layer.delivery, surface, session.deviceId))
   const shownIds = new Set(shownLayers.map((layer) => layer.id))
   const openLayer = openLayerId ? shownLayers.find((layer) => layer.id === openLayerId) ?? null : null
@@ -276,37 +278,55 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
     })
   }
 
+  async function readFix(): Promise<HereFix | null> {
+    const result = (await mapRef.current?.locate()) ?? "waiting"
+    if (typeof result === "string") {
+      setLocationProblem(result)
+      return null
+    }
+    setLocationProblem(null)
+    setCursor(result.coordinate)
+    return result
+  }
+
   async function locate() {
     setLocating(true)
-    setLocationOff(false)
-    const fix = (await mapRef.current?.locate()) ?? null
+    await readFix()
     setLocating(false)
-    if (!fix) setLocationOff(true)
-    else setCursor(fix.coordinate)
   }
 
   async function markHere() {
     if (!openLayer || openLayer.geometryType !== "Point") return
-    const fix = (await mapRef.current?.locate()) ?? null
-    if (!fix) { setLocationOff(true); return }
+    const fix = await readFix()
+    if (!fix) return
     const count = project.model.features.filter((feature) => feature.layerId === openLayer.id).length
     const accuracyM = fix.accuracyM == null ? null : Math.round(fix.accuracyM)
-    await project.createPoint(openLayer.id, fix.coordinate, t("markHere") + " " + (count + 1), { accuracyM })
+    await project.createPoint(openLayer.id, fix.coordinate, t("markHere") + " " + (count + 1), {
+      accuracyM,
+      sampledAt: fix.sampledAt,
+      precise: isPrecise(fix.accuracyM),
+    })
   }
 
   async function averageHere() {
     if (!openLayer || openLayer.geometryType !== "Point") return
     setFieldBusy(true)
-    const fixes = await collectFixes()
+    const collected = await collectFixes()
     setFieldBusy(false)
-    const result = averagePositions(fixes)
-    if (!result) { setLocationOff(true); return }
+    const result = averagePositions(collected.fixes)
+    if (!result) {
+      setLocationProblem(collected.fixes.length > 0 ? "coarse" : collected.problem ?? "waiting")
+      return
+    }
+    setLocationProblem(null)
     const count = project.model.features.filter((feature) => feature.layerId === openLayer.id).length
     const accuracyM = result.medianReportedAccuracyM == null ? null : Math.round(result.medianReportedAccuracyM)
     await project.createPoint(openLayer.id, [result.coordinate[0], result.coordinate[1]], t("averageHere") + " " + (count + 1), {
       accuracyM,
       fixes: result.count,
       scatterM: Math.round(result.rmsScatterM),
+      sampledAt: new Date().toISOString(),
+      precise: true,
     })
   }
 
@@ -431,7 +451,7 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
         />
       ) : null}
       {status && !placingLayer ? (
-        <button type="button" className="absolute left-2 top-[max(8px,env(safe-area-inset-top))] z-20 max-w-[70%] truncate rounded-full bg-white px-3 py-1 text-xs shadow" role="status" onClick={() => { if (locationOff) void locate(); else syncNow() }}>
+        <button type="button" className="absolute left-2 top-[max(8px,env(safe-area-inset-top))] z-20 max-w-[70%] truncate rounded-full bg-white px-3 py-1 text-xs shadow" role="status" onClick={() => { if (locationProblem) void locate(); else syncNow() }}>
           {status}
         </button>
       ) : null}

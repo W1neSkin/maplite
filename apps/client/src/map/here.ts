@@ -9,12 +9,14 @@ import Stroke from "ol/style/Stroke"
 import Style from "ol/style/Style"
 import Text from "ol/style/Text"
 import { t } from "../i18n/translate.js"
+import { positionProblem } from "./position.js"
 
 export const HERE_ZOOM = 16
 
 export type HereFix = {
   coordinate: [number, number]
   accuracyM: number | null
+  sampledAt: string
 }
 
 /** Point in front, geodesic accuracy ring behind it. */
@@ -74,8 +76,9 @@ export function readPosition(): Promise<HereFix> {
       (position) => resolve({
         coordinate: [position.coords.longitude, position.coords.latitude],
         accuracyM: Number.isFinite(position.coords.accuracy) ? position.coords.accuracy : null,
+        sampledAt: new Date(position.timestamp).toISOString(),
       }),
-      () => reject(new Error("unavailable")),
+      (error) => reject(new Error(positionProblem(error.code))),
       { enableHighAccuracy: true, timeout: 12000, maximumAge: 15000 },
     )
   })

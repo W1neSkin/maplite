@@ -26,6 +26,7 @@ import { DEV_BASEMAP_URL } from "./basemap.js"
 import { readTile, rememberTile, watchTiles } from "./tile-cache.js"
 import { FRAME_MARGIN, extentToScreen, frameFeature, panToCenterDelta } from "./frame.js"
 import { HERE_ZOOM, hereStyle, placeHere, readPosition, type HereFix } from "./here.js"
+import type { PositionProblem } from "./position.js"
 import { updateKmGrid } from "./km-grid.js"
 import { featureStyle, paintFeature } from "./style.js"
 import { attachVertexEdit } from "./vertex-edit.js"
@@ -38,7 +39,7 @@ export type MapHandle = {
   fit(): void
   fitBox(box: [number, number, number, number]): void
   show(id: string, padding: [number, number, number, number]): void
-  locate(): Promise<HereFix | null>
+  locate(): Promise<HereFix | PositionProblem>
 }
 
 type MapViewProps = {
@@ -474,7 +475,7 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
     async locate() {
       const map = mapRef.current
       const here = hereRef.current
-      if (!map || !here) return null
+      if (!map || !here) return "waiting"
       try {
         const fix = await readPosition()
         hasHere.current = true
@@ -485,8 +486,8 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
         if (view.getProjection().getCode() === "EPSG:3857") view.animate({ center: viewFromLonLat(map, fix.coordinate), zoom: HERE_ZOOM, duration: 250 })
         else view.animate({ center: viewFromLonLat(map, fix.coordinate), resolution: 2, duration: 250 })
         return fix
-      } catch {
-        return null
+      } catch (error) {
+        return error instanceof Error && error.message === "denied" ? "denied" : "waiting"
       }
     },
   }), [])

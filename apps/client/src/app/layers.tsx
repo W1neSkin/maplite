@@ -1,4 +1,5 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { formatWhen } from "../i18n/format.js"
 import { t } from "../i18n/translate.js"
 import { measureLabel } from "./measure-label.js"
 import type { MapFeature, MapLayer } from "./model.js"
@@ -168,6 +169,8 @@ function shownProperty(key: string, value: unknown): { label: string; text: stri
     return { label: key === "accuracyM" ? t("reportedAccuracy") : t("scatter"), text: t("accuracyMeters", { meters: Math.round(value) }) }
   }
   if (key === "fixes") return { label: t("fixes"), text: String(value) }
+  if (key === "sampledAt" && typeof value === "string") return { label: t("sampledAt"), text: formatWhen(value) }
+  if (key === "precise" && typeof value === "boolean") return { label: t("fixQuality"), text: value ? t("preciseFix") : t("coarseFix") }
   return { label: key, text: String(value) }
 }
 
