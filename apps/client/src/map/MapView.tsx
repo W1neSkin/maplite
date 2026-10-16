@@ -25,7 +25,7 @@ import type { MapFeature } from "../app/model.js"
 import { DEV_BASEMAP_URL } from "./basemap.js"
 import { readTile, rememberTile, watchTiles } from "./tile-cache.js"
 import { FRAME_MARGIN, extentToScreen, frameFeature, panToCenterDelta } from "./frame.js"
-import { HERE_ZOOM, hereStyle, placeHere, readPosition } from "./here.js"
+import { HERE_ZOOM, hereStyle, placeHere, readPosition, type HereFix } from "./here.js"
 import { updateKmGrid } from "./km-grid.js"
 import { featureStyle, paintFeature } from "./style.js"
 import { attachVertexEdit } from "./vertex-edit.js"
@@ -38,7 +38,7 @@ export type MapHandle = {
   fit(): void
   fitBox(box: [number, number, number, number]): void
   show(id: string, padding: [number, number, number, number]): void
-  locate(): Promise<[number, number] | null>
+  locate(): Promise<HereFix | null>
 }
 
 type MapViewProps = {
@@ -152,7 +152,7 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
   const geometryRef = useRef(onGeometry)
   const didFit = useRef(false)
   const hasHere = useRef(false)
-  const hereLonLat = useRef<[number, number] | null>(null)
+  const hereFix = useRef<HereFix | null>(null)
   const [rotation, setRotation] = useState(0)
   selectRef.current = onSelect
   liveSelectRef.current = onLive
@@ -205,7 +205,7 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
     const vectors = new VectorSource()
     const grid = new VectorSource()
     const here = new VectorSource()
-    const hereLayer = new VectorLayer({ source: here, style: hereStyle() })
+    const hereLayer = new VectorLayer({ source: here, style: (feature) => hereStyle(feature) })
     hereLayer.set("kind", "here")
     const liveSource = new VectorSource()
     const liveLayer = new VectorLayer({
@@ -310,16 +310,16 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
     map.on("moveend", onMove)
     onMove()
     void readPosition()
-      .then((coordinate) => {
+      .then((fix) => {
         if (mapRef.current !== map) return
         hasHere.current = true
-        hereLonLat.current = coordinate
-        placeHere(here, viewFromLonLat(map, coordinate))
+        hereFix.current = fix
+        placeHere(here, (coordinate) => viewFromLonLat(map, coordinate), fix)
         const view = map.getView()
-        view.setCenter(viewFromLonLat(map, coordinate))
+        view.setCenter(viewFromLonLat(map, fix.coordinate))
         if (view.getProjection().getCode() === "EPSG:3857") view.setZoom(HERE_ZOOM)
         else view.setResolution(2)
-        locatedRef.current?.(coordinate)
+        locatedRef.current?.(fix.coordinate)
       })
       .catch(() => {})
     return () => {
@@ -359,9 +359,9 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
       rotation: rotationNow,
       extent: next === "EPSG:3857" ? undefined : getProjection(next)?.getExtent(),
     }))
-    const fix = hereLonLat.current
+    const fix = hereFix.current
     const here = hereRef.current
-    if (fix && here) placeHere(here, transform(fix, "EPSG:4326", next))
+    if (fix && here) placeHere(here, (coordinate) => transform(coordinate, "EPSG:4326", next), fix)
     const onRotateNow = () => setRotation(map.getView().getRotation())
     map.getView().on("change:rotation", onRotateNow)
     setRotation(map.getView().getRotation())
@@ -476,15 +476,15 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
       const here = hereRef.current
       if (!map || !here) return null
       try {
-        const coordinate = await readPosition()
+        const fix = await readPosition()
         hasHere.current = true
-        hereLonLat.current = coordinate
-        placeHere(here, viewFromLonLat(map, coordinate))
+        hereFix.current = fix
+        placeHere(here, (coordinate) => viewFromLonLat(map, coordinate), fix)
         map.getView().cancelAnimations()
         const view = map.getView()
-        if (view.getProjection().getCode() === "EPSG:3857") view.animate({ center: viewFromLonLat(map, coordinate), zoom: HERE_ZOOM, duration: 250 })
-        else view.animate({ center: viewFromLonLat(map, coordinate), resolution: 2, duration: 250 })
-        return coordinate
+        if (view.getProjection().getCode() === "EPSG:3857") view.animate({ center: viewFromLonLat(map, fix.coordinate), zoom: HERE_ZOOM, duration: 250 })
+        else view.animate({ center: viewFromLonLat(map, fix.coordinate), resolution: 2, duration: 250 })
+        return fix
       } catch {
         return null
       }

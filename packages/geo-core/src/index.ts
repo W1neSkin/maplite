@@ -42,7 +42,7 @@ export {
   type RegistrationSolution,
   type Similarity,
 } from "./registration.js"
-export { geodesicLength, measureLine, measurePolygon, ringSelfIntersects, type MeasureResult, type Ring } from "./measure.js"
+export { accuracyRing, geodesicLength, measureLine, measurePolygon, ringSelfIntersects, type MeasureResult, type Ring } from "./measure.js"
 export { averagePositions, type AverageFix, type AverageResult } from "./average.js"
 export {
   GeoError,

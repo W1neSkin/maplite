@@ -277,18 +277,19 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
   async function locate() {
     setLocating(true)
     setLocationOff(false)
-    const coordinate = (await mapRef.current?.locate()) ?? null
+    const fix = (await mapRef.current?.locate()) ?? null
     setLocating(false)
-    if (!coordinate) setLocationOff(true)
-    else setCursor(coordinate)
+    if (!fix) setLocationOff(true)
+    else setCursor(fix.coordinate)
   }
 
   async function markHere() {
     if (!openLayer || openLayer.geometryType !== "Point") return
-    const coordinate = (await mapRef.current?.locate()) ?? null
-    if (!coordinate) { setLocationOff(true); return }
+    const fix = (await mapRef.current?.locate()) ?? null
+    if (!fix) { setLocationOff(true); return }
     const count = project.model.features.filter((feature) => feature.layerId === openLayer.id).length
-    await project.createPoint(openLayer.id, coordinate, t("markHere") + " " + (count + 1))
+    const accuracyM = fix.accuracyM == null ? null : Math.round(fix.accuracyM)
+    await project.createPoint(openLayer.id, fix.coordinate, t("markHere") + " " + (count + 1), { accuracyM })
   }
 
   async function averageHere() {
@@ -299,7 +300,12 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
     const result = averagePositions(fixes)
     if (!result) { setLocationOff(true); return }
     const count = project.model.features.filter((feature) => feature.layerId === openLayer.id).length
-    await project.createPoint(openLayer.id, [result.coordinate[0], result.coordinate[1]], t("averageHere") + " " + (count + 1))
+    const accuracyM = result.medianReportedAccuracyM == null ? null : Math.round(result.medianReportedAccuracyM)
+    await project.createPoint(openLayer.id, [result.coordinate[0], result.coordinate[1]], t("averageHere") + " " + (count + 1), {
+      accuracyM,
+      fixes: result.count,
+      scatterM: Math.round(result.rmsScatterM),
+    })
   }
 
   async function buildShape(kind: "LineString" | "Polygon") {

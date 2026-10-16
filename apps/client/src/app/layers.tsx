@@ -151,6 +151,16 @@ function revealInSheet(row: HTMLElement) {
   else if (below > 0) scroller.scrollTop += below
 }
 
+/** Name is already the row title. Accuracy fields use words, not the stored key. */
+function shownProperty(key: string, value: unknown): { label: string; text: string } | null {
+  if (key === "name") return null
+  if ((key === "accuracyM" || key === "scatterM") && typeof value === "number") {
+    return { label: key === "accuracyM" ? t("reportedAccuracy") : t("scatter"), text: t("accuracyMeters", { meters: Math.round(value) }) }
+  }
+  if (key === "fixes") return { label: t("fixes"), text: String(value) }
+  return { label: key, text: String(value) }
+}
+
 function FeatureRow(props: { feature: MapFeature; selected: boolean; locked: boolean; onSelect: () => void; onRename: (name: string) => void; onDelete: () => void }) {
   const rowRef = useRef<HTMLLIElement>(null)
   const [editing, setEditing] = useState(false)
@@ -222,9 +232,11 @@ function FeatureRow(props: { feature: MapFeature; selected: boolean; locked: boo
       {size ? <p className="px-7 pb-1 text-xs text-neutral-500">{size}</p> : null}
       {props.selected ? (
         <dl className="px-7 pb-1 text-xs text-neutral-500">
-          {Object.entries(props.feature.properties).map(([key, value]) => (
-            <div key={key} className="flex gap-2"><dt className="shrink-0">{key}</dt><dd className="min-w-0 truncate">{String(value)}</dd></div>
-          ))}
+          {Object.entries(props.feature.properties).map(([key, value]) => {
+            const shown = shownProperty(key, value)
+            if (!shown) return null
+            return <div key={key} className="flex gap-2"><dt className="shrink-0">{shown.label}</dt><dd className="min-w-0 truncate">{shown.text}</dd></div>
+          })}
         </dl>
       ) : null}
     </li>

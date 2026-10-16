@@ -46,6 +46,22 @@ export function ringSelfIntersects(ring: Ring): boolean {
   return false
 }
 
+/**
+ * Closed ring at a constant geodesic distance from the centre.
+ * The radius is metres on the WGS 84 ellipsoid, not a radius in map pixels.
+ */
+export function accuracyRing(center: Crs84Coordinate, radiusM: number, steps = 48): Crs84Coordinate[] {
+  const ring: Crs84Coordinate[] = []
+  for (let step = 0; step < steps; step += 1) {
+    const azimuth = (step / steps) * 360
+    const direct = geodesic.Direct(center[1], center[0], azimuth, radiusM)
+    ring.push([direct.lon2 ?? center[0], direct.lat2 ?? center[1]])
+  }
+  const first = ring[0]
+  if (first) ring.push(first)
+  return ring
+}
+
 export function geodesicLength(coordinates: readonly Crs84Coordinate[]): number {
   let length = 0
   for (let index = 1; index < coordinates.length; index += 1) {

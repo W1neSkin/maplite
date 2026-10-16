@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest"
-import { averagePositions, geodesicLength, measurePolygon } from "../src/index.js"
+import { accuracyRing, averagePositions, geodesicLength, measurePolygon } from "../src/index.js"
 
 describe("geodesic measurements", () => {
   it("measures a kilometre-scale line and a polygon with a hole", () => {
@@ -28,6 +28,18 @@ describe("geodesic measurements", () => {
     expect(solid.areaM2).toBeGreaterThan(1_000_000)
     expect(withHole.areaM2!).toBeLessThan(solid.areaM2!)
     expect(withHole.selfIntersecting).toBe(false)
+  })
+
+  it("keeps an accuracy ring on the ellipsoid", () => {
+    const center: [number, number] = [27.5, 53.9]
+    const ring = accuracyRing(center, 100, 8)
+    expect(ring).toHaveLength(9)
+    expect(ring[0]).toEqual(ring[8])
+    for (const point of ring.slice(0, -1)) {
+      const distance = geodesicLength([center, point])
+      expect(distance).toBeGreaterThan(99)
+      expect(distance).toBeLessThan(101)
+    }
   })
 
   it("does not publish an ordinary area for a bow-tie", () => {

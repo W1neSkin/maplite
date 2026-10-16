@@ -258,7 +258,7 @@ export function useProject(session: Session) {
     return ok ? id : null
   }
 
-  async function createPoint(layerId: string, coordinate: [number, number], name: string): Promise<string | null> {
+  async function createPoint(layerId: string, coordinate: [number, number], name: string, extra: Record<string, JsonValue> = {}): Promise<string | null> {
     if (!session.projectId) return null
     const id = createId()
     const payload: Feature = {
@@ -266,7 +266,7 @@ export function useProject(session: Session) {
       projectId: session.projectId,
       layerId,
       geometry: { type: "Point", coordinates: [Number(coordinate[0].toFixed(6)), Number(coordinate[1].toFixed(6))] },
-      properties: { name },
+      properties: { name, ...extra },
     }
     const ok = await send({ opId: createId(), clientId: clientId(), projectId: session.projectId, entityType: "feature", entityId: id, kind: "create", baseVersion: null, payload })
     return ok ? id : null
