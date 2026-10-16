@@ -1,7 +1,7 @@
 import { useState, type Ref } from "react"
 import { formatWhen } from "../i18n/format.js"
 import { t } from "../i18n/translate.js"
-import { BackIcon, CloseIcon, DisconnectIcon, IconButton, LayersIcon, LocateIcon, PinIcon, SyncIcon } from "./icons.js"
+import { BackIcon, CheckIcon, CloseIcon, DisconnectIcon, IconButton, LayersIcon, LocateIcon, PinIcon, SyncIcon, UndoIcon } from "./icons.js"
 
 export function MapDock(props: {
   dockRef: Ref<HTMLElement>
@@ -35,6 +35,10 @@ export function PlacingBar(props: {
   layers: readonly { id: string; name: string }[]
   onLayer: (id: string) => void
   onClose: () => void
+  sketch?: boolean
+  canFinish?: boolean
+  onUndo?: () => void
+  onFinish?: () => void
 }) {
   const layer = props.layers.find((item) => item.id === props.layerId)
   const [open, setOpen] = useState(false)
@@ -47,6 +51,16 @@ export function PlacingBar(props: {
           value={props.name}
           onChange={(event) => props.onName(event.target.value)}
         />
+        {props.sketch ? (
+          <IconButton tone="inverse" aria-label={t("undoVertex")} title={t("undoVertex")} onClick={props.onUndo}>
+            <UndoIcon />
+          </IconButton>
+        ) : null}
+        {props.sketch ? (
+          <IconButton tone="accent" aria-label={t("finishShape")} title={t("finishShape")} disabled={!props.canFinish} onClick={props.onFinish}>
+            <CheckIcon />
+          </IconButton>
+        ) : null}
         <IconButton tone="inverse" aria-label={t("close")} title={t("close")} onClick={props.onClose}>
           <CloseIcon />
         </IconButton>

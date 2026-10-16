@@ -118,7 +118,7 @@ export function useProject(session: Session) {
     return send({ opId: createId(), clientId: clientId(), projectId: session.projectId, entityType: "layer", entityId: id, kind: "delete", baseVersion: versionOf(id) })
   }
 
-  async function createPointLayer(name: string): Promise<string | null> {
+  async function createPointLayer(name: string, geometryType: Layer["geometryType"] = "Point"): Promise<string | null> {
     if (!session.projectId) return null
     const id = createId()
     const payload: Layer = {
@@ -126,8 +126,8 @@ export function useProject(session: Session) {
       projectId: session.projectId,
       groupId: null,
       name,
-      geometryType: "Point",
-      style: { color: "#2563eb", fillOpacity: 0, strokeWidth: 2, labelAttribute: null },
+      geometryType,
+      style: { color: "#2563eb", fillOpacity: geometryType === "Polygon" ? 0.28 : 0, strokeWidth: 2, labelAttribute: null },
       source: null,
       status: "ready",
       order: model.layers.length,
@@ -146,6 +146,14 @@ export function useProject(session: Session) {
       geometry: { type: "Point", coordinates: [Number(coordinate[0].toFixed(6)), Number(coordinate[1].toFixed(6))] },
       properties: { name },
     }
+    const ok = await send({ opId: createId(), clientId: clientId(), projectId: session.projectId, entityType: "feature", entityId: id, kind: "create", baseVersion: null, payload })
+    return ok ? id : null
+  }
+
+  async function createFeature(layerId: string, geometry: Feature["geometry"], name: string): Promise<string | null> {
+    if (!session.projectId) return null
+    const id = createId()
+    const payload: Feature = { id, projectId: session.projectId, layerId, geometry, properties: { name } }
     const ok = await send({ opId: createId(), clientId: clientId(), projectId: session.projectId, entityType: "feature", entityId: id, kind: "create", baseVersion: null, payload })
     return ok ? id : null
   }
@@ -214,5 +222,5 @@ export function useProject(session: Session) {
     return records
   }
 
-  return { model, loading, failed, setFailed, upgrade, conflict, setConflict, lastSync, pull, send, renameLayer, deleteLayer, createPointLayer, createPoint, renameFeature, deleteFeature, movePoint, reorderLayers, importLayer, recordsIn }
+  return { model, loading, failed, setFailed, upgrade, conflict, setConflict, lastSync, pull, send, renameLayer, deleteLayer, createPointLayer, createPoint, createFeature, renameFeature, deleteFeature, movePoint, reorderLayers, importLayer, recordsIn }
 }

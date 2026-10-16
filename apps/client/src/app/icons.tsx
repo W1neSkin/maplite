@@ -107,6 +107,15 @@ export function GripIcon() {
   )
 }
 
+export function UndoIcon() {
+  return (
+    <Glyph>
+      <path d="M9 14 4 9l5-5" />
+      <path d="M4 9h10a6 6 0 0 1 0 12H9" />
+    </Glyph>
+  )
+}
+
 export function ExportIcon() {
   return (
     <Glyph>

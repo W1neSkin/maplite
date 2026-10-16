@@ -31,6 +31,7 @@ type MapViewProps = {
   placing?: boolean
   callout?: MapCallout | null
   projectionId?: string | null
+  draft?: { type: "LineString" | "Polygon"; coordinates: [number, number][] } | null
   onBasemapFailed: (failed: boolean) => void
   onCenter?: (coordinate: [number, number]) => void
   onSelect?: (featureId: string | null) => void
@@ -113,7 +114,7 @@ function showFeature(map: Map, source: VectorSource, id: string, padding: [numbe
   view.fit(extent, { padding: fitted, maxZoom: typeof zoom === "number" ? zoom : 16, duration: 180, size })
 }
 
-export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ features, selectedId = null, placing = false, callout = null, projectionId = null, onBasemapFailed, onSelect, onPlace, onCursor, onLocated, onCenter }, ref) {
+export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ features, selectedId = null, placing = false, callout = null, projectionId = null, draft = null, onBasemapFailed, onSelect, onPlace, onCursor, onLocated, onCenter }, ref) {
   const target = useRef<HTMLDivElement>(null)
   const mapRef = useRef<Map | null>(null)
   const sourceRef = useRef<VectorSource | null>(null)
@@ -268,11 +269,22 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
     const projection = map.getView().getProjection().getCode()
     source.clear()
     source.addFeatures(features.map((feature) => toOlFeature(feature, feature.id === selectedId, projection)))
+    if (draft && draft.coordinates.length > 0) {
+      const geometry = draft.coordinates.length === 1
+        ? { type: "Point" as const, coordinates: draft.coordinates[0]! }
+        : draft.type === "Polygon" && draft.coordinates.length >= 3
+          ? { type: "Polygon" as const, coordinates: [[...draft.coordinates, draft.coordinates[0]!]] }
+          : { type: "LineString" as const, coordinates: draft.coordinates }
+      const sketch = toOlFeature({ id: "draft", name: "", layerId: "", geometry, color: "#2563eb", fillOpacity: 0.15, strokeWidth: 2, stack: 200000 }, false, projection)
+      sketch.setId(undefined)
+      sketch.set("draft", true)
+      source.addFeature(sketch)
+    }
     if (!didFit.current && features.length > 0 && !hasHere.current) {
       fitSource(map, source)
       didFit.current = true
     }
-  }, [features, selectedId, projectionId])
+  }, [features, selectedId, projectionId, draft])
 
   useLayoutEffect(() => {
     const overlay = calloutOverlay.current

@@ -14,8 +14,8 @@ function hexToRgba(hex: string, opacity: number): string {
   return `rgba(${(value >> 16) & 255}, ${(value >> 8) & 255}, ${value & 255}, ${opacity})`
 }
 
-function line(color: string, width: number): Stroke {
-  return new Stroke({ color, width, lineCap: "round", lineJoin: "round" })
+function line(color: string, width: number, dashed = false): Stroke {
+  return new Stroke({ color, width, lineCap: "round", lineJoin: "round", lineDash: dashed ? [6, 4] : undefined })
 }
 
 export function featureStyle(feature: FeatureLike): Style | Style[] {
@@ -26,17 +26,18 @@ export function featureStyle(feature: FeatureLike): Style | Style[] {
   const stack = Number(feature.get("stack") ?? 0)
   const rank = stack + (selected ? 100000 : 0)
   const type = feature.getGeometry()?.getType()
+  const draft = feature.get("draft") === true
   if (type === "LineString") {
     const width = selected ? strokeWidth + 3 : strokeWidth
     return [
       new Style({ stroke: line("#ffffff", width + (selected ? 5 : 3)), zIndex: rank }),
-      new Style({ stroke: line(selected ? BLUE : color, width), zIndex: rank }),
+      new Style({ stroke: line(selected || draft ? BLUE : color, width, draft), zIndex: rank }),
     ]
   }
   if (type === "Polygon") {
     const opacity = selected ? Math.min(0.65, fillOpacity + 0.3) : fillOpacity
     return new Style({
-      stroke: line(selected ? BLUE : color, selected ? strokeWidth + 1 : strokeWidth),
+      stroke: line(selected || draft ? BLUE : color, selected ? strokeWidth + 1 : strokeWidth, draft),
       fill: new Fill({ color: hexToRgba(color, opacity) }),
       zIndex: rank,
     })

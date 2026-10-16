@@ -58,6 +58,7 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
   const [openLayerId, setOpenLayerId] = useState<string | null>(null)
   const [placingLayerId, setPlacingLayerId] = useState<string | null>(null)
   const [placeName, setPlaceName] = useState("")
+  const [vertices, setVertices] = useState<[number, number][]>([])
   const placeNameTouched = useRef(false)
   const [reveal, setReveal] = useState<{ id: string; token: number } | null>(null)
   const [cursor, setCursor] = useState<[number, number] | null>(null)
@@ -90,11 +91,14 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
   }
 
   function suggestedName(layerId: string) {
+    const layer = project.model.layers.find((item) => item.id === layerId)
     const count = project.model.features.filter((feature) => feature.layerId === layerId).length
-    return t("defaultPointName", { n: count + 1 })
+    const key = layer?.geometryType === "LineString" ? "defaultLineName" : layer?.geometryType === "Polygon" ? "defaultPolygonName" : "defaultPointName"
+    return t(key, { n: count + 1 })
   }
 
   function startPlacing(layerId: string) {
+    setVertices([])
     setPlacingLayerId(layerId)
     setOpenLayerId(layerId)
     setSelectedId(null)
@@ -104,10 +108,12 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
   function beginAdd() {
     if (placingLayerId) {
       setPlacingLayerId(null)
+      setVertices([])
       return
     }
+    const currentLayer = project.model.layers.find((layer) => layer.id === openLayerId)
     const points = pointLayers()
-    const current = points.find((layer) => layer.id === openLayerId) ?? points[0]
+    const current = currentLayer ?? points[0]
     if (!current) {
       setSelectedId(null)
       setOpenLayerId(null)
@@ -121,6 +127,7 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
 
   function choosePlaceLayer(layerId: string) {
     if (!placeNameTouched.current) setPlaceName(suggestedName(layerId))
+    setVertices([])
     setPlacingLayerId(layerId)
     setOpenLayerId(layerId)
   }
@@ -134,13 +141,39 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
   }
 
   async function placeAt(coordinate: [number, number]) {
-    const layerId = placingLayerId
-    if (!layerId) return
+    const layer = placingLayer
+    if (!layer) return
+    const rounded: [number, number] = [Number(coordinate[0].toFixed(6)), Number(coordinate[1].toFixed(6))]
+    if (layer.geometryType !== "Point") {
+      setVertices((current) => [...current, rounded])
+      setCursor(rounded)
+      return
+    }
+    const layerId = layer.id
     setPlacingLayerId(null)
     const name = placeName.trim() || suggestedName(layerId)
-    const id = await project.createPoint(layerId, coordinate, name)
+    const id = await project.createPoint(layerId, rounded, name)
     if (!id) return
     setOpenLayerId(layerId)
+    setSelectedId(id)
+    setSheet(true)
+    markReveal(id)
+  }
+
+  async function finishShape() {
+    const layer = placingLayer
+    if (!layer || layer.geometryType === "Point") return
+    if (layer.geometryType === "LineString" && vertices.length < 2) return
+    if (layer.geometryType === "Polygon" && vertices.length < 3) return
+    const name = placeName.trim() || suggestedName(layer.id)
+    const geometry = layer.geometryType === "LineString"
+      ? { type: "LineString" as const, coordinates: vertices }
+      : { type: "Polygon" as const, coordinates: [[...vertices, vertices[0]!]] }
+    setPlacingLayerId(null)
+    setVertices([])
+    const id = await project.createFeature(layer.id, geometry, name)
+    if (!id) return
+    setOpenLayerId(layer.id)
     setSelectedId(id)
     setSheet(true)
     markReveal(id)
@@ -202,6 +235,7 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
         selectedId={selectedId}
         placing={placingLayerId !== null}
         callout={callout}
+        draft={placingLayer && placingLayer.geometryType !== "Point" && vertices.length > 0 ? { type: placingLayer.geometryType, coordinates: vertices } : null}
         projectionId={activeProfile?.id ?? null}
         onBasemapFailed={setBasemapFailed}
         onCenter={setMapCenter}
@@ -218,9 +252,13 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
             setPlaceName(name)
           }}
           layerId={placingLayer.id}
-          layers={pointLayers()}
+          layers={project.model.layers.filter((layer) => layer.geometryType === placingLayer.geometryType)}
           onLayer={choosePlaceLayer}
-          onClose={() => setPlacingLayerId(null)}
+          onClose={() => { setPlacingLayerId(null); setVertices([]) }}
+          sketch={placingLayer.geometryType !== "Point"}
+          canFinish={placingLayer.geometryType === "LineString" ? vertices.length >= 2 : vertices.length >= 3}
+          onUndo={() => setVertices((current) => current.slice(0, -1))}
+          onFinish={() => void finishShape()}
         />
       ) : null}
       {status && !placingLayer ? (
@@ -275,7 +313,7 @@ export function ProjectScreen({ session, onDisconnect, onBack }: { session: Sess
             onSelectFeature={selectFeature}
             onRenameFeature={project.renameFeature}
             onDeleteFeature={(id) => { project.deleteFeature(id); setSelectedId(null) }}
-            onCreateLayer={(name) => void project.createPointLayer(name).then((id) => {
+            onCreateLayer={(name, geometryType) => void project.createPointLayer(name, geometryType).then((id) => {
               if (!id) return
               placeNameTouched.current = false
               setPlaceName(t("defaultPointName", { n: 1 }))

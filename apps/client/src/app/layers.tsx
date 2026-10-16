@@ -12,7 +12,7 @@ type LayerBrowserProps = {
   onSelectFeature: (id: string) => void
   onRenameFeature: (id: string, name: string) => void
   onDeleteFeature: (id: string) => void
-  onCreateLayer: (name: string) => void
+  onCreateLayer: (name: string, geometryType: MapLayer["geometryType"]) => void
   hidden: ReadonlySet<string>
   onToggleVisible: (id: string) => void
   onReorder: (from: number, to: number) => void
@@ -161,9 +161,10 @@ function FeatureRow(props: { feature: MapFeature; selected: boolean; onSelect: (
   )
 }
 
-function NewLayer(props: { onCreate: (name: string) => void }) {
+function NewLayer(props: { onCreate: (name: string, geometryType: MapLayer["geometryType"]) => void }) {
   const [open, setOpen] = useState(false)
   const [name, setName] = useState("")
+  const [geometryType, setGeometryType] = useState<MapLayer["geometryType"]>("Point")
   if (!open) {
     return (
       <IconButton tone="fill" aria-label={t("newLayer")} title={t("newLayer")} onClick={() => setOpen(true)}>
@@ -173,16 +174,25 @@ function NewLayer(props: { onCreate: (name: string) => void }) {
   }
   return (
     <form
-      className="flex items-center gap-1"
+      className="flex flex-col gap-1"
       onSubmit={(event) => {
         event.preventDefault()
         const next = name.trim()
         if (!next) return
-        props.onCreate(next)
+        props.onCreate(next, geometryType)
         setName("")
+        setGeometryType("Point")
         setOpen(false)
       }}
     >
+      <div className="flex gap-1">
+        {(["Point", "LineString", "Polygon"] as const).map((item) => (
+          <button key={item} type="button" aria-label={t(item === "Point" ? "pointLayer" : item === "LineString" ? "lineLayer" : "polygonLayer")} className={geometryType === item ? "grid h-8 w-8 place-items-center rounded-full bg-blue-50" : "grid h-8 w-8 place-items-center rounded-full"} onClick={() => setGeometryType(item)}>
+            <GeometryGlyph type={item} />
+          </button>
+        ))}
+      </div>
+      <div className="flex items-center gap-1">
       <input aria-label={t("newLayer")} className="h-8 min-w-0 flex-1 rounded-lg border border-[var(--border)] bg-white px-2 text-sm" value={name} autoFocus onChange={(event) => setName(event.target.value)} />
       <IconButton tone="accent" type="submit" aria-label={t("createLayer")} title={t("createLayer")} disabled={!name.trim()}>
         <CheckIcon />
@@ -190,6 +200,7 @@ function NewLayer(props: { onCreate: (name: string) => void }) {
       <IconButton tone="fill" aria-label={t("cancel")} title={t("cancel")} onClick={() => { setName(""); setOpen(false) }}>
         <CloseIcon />
       </IconButton>
+      </div>
     </form>
   )
 }
@@ -197,11 +208,9 @@ function NewLayer(props: { onCreate: (name: string) => void }) {
 export function LayerActions(props: { geometryType: MapLayer["geometryType"]; onAdd: () => void; onExport: () => void; onDelete: () => void }) {
   return (
     <>
-      {props.geometryType === "Point" ? (
-        <IconButton tone="fill" aria-label={t("addToLayer")} title={t("addToLayer")} onClick={props.onAdd}>
-          <PinIcon />
-        </IconButton>
-      ) : null}
+      <IconButton tone="fill" aria-label={t(props.geometryType === "Point" ? "addToLayer" : props.geometryType === "LineString" ? "drawLine" : "drawPolygon")} title={t(props.geometryType === "Point" ? "addToLayer" : props.geometryType === "LineString" ? "drawLine" : "drawPolygon")} onClick={props.onAdd}>
+        {props.geometryType === "Point" ? <PinIcon /> : <GeometryGlyph type={props.geometryType} />}
+      </IconButton>
       <IconButton tone="fill" aria-label={t("exportLayer")} title={t("exportLayer")} onClick={props.onExport}>
         <ExportIcon />
       </IconButton>
