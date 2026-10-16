@@ -1,0 +1,26 @@
+{
+  "name": "@cartography/geo-core",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "default": "./src/index.ts"
+    }
+  },
+  "scripts": {
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "geographiclib-geodesic": "^2.1.1",
+    "proj4": "^2.15.0"
+  },
+  "devDependencies": {
+    "@types/proj4": "^2.5.6"
+  }
+}
