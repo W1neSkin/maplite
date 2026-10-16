@@ -2,6 +2,7 @@ import { createId } from "@cartography/project-schema"
 import { randomBytes } from "node:crypto"
 import { hashSecret } from "../auth/tokens.js"
 import type { AppDatabase } from "../db/open.js"
+import { latestCommand, type DeviceCommand } from "./commands.js"
 import { issueProjectToken } from "./tokens.js"
 
 const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567"
@@ -95,6 +96,7 @@ export type DeviceSummary = {
   actualState: string
   desiredState: string
   lastSeenAt: string | null
+  command: DeviceCommand | null
 }
 
 export function listDevices(db: AppDatabase, projectId: string): DeviceSummary[] {
@@ -118,6 +120,7 @@ export function listDevices(db: AppDatabase, projectId: string): DeviceSummary[]
     actualState: row.actual_state,
     desiredState: row.desired_state,
     lastSeenAt: row.last_seen_at,
+    command: latestCommand(db, row.id),
   }))
 }
 

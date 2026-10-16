@@ -3,7 +3,8 @@ import type { ImportReady } from "../import/load.js"
 import { useCallback, useEffect, useRef, useState } from "react"
 import { clientId, editOrigin, isPhoneApp, type Session } from "./connection.js"
 import { buildMapModel, type MapModel } from "./model.js"
-import { applyLocal, forgetOps, readPhoneCache, rememberOps, writePhoneCache } from "./phone-queue.js"
+import { readDurable, writeDurable } from "./outbox.js"
+import { applyLocal, forgetOps, readPhoneCache, rememberOps } from "./phone-queue.js"
 import { pushOps, readAll, readChanges, watchChanges } from "../sync/api.js"
 import { applyRemote } from "../sync/edits.js"
 import { deliveryOperations } from "./delivery.js"
@@ -28,7 +29,8 @@ function layerOf(docs: SnapshotEntity[], id: string): Layer | null {
 
 export function useProject(session: Session) {
   const phone = isPhoneApp()
-  const cached = phone && session.projectId ? readPhoneCache(localStorage, session.projectId) : { ops: [], docs: [] }
+  const cached = session.projectId ? readPhoneCache(localStorage, session.projectId) : { ops: [], docs: [] }
+  const box = useRef(cached)
   const cursor = useRef(0)
   const [docs, setDocs] = useState<SnapshotEntity[]>(cached.docs)
   const [loading, setLoading] = useState(cached.docs.length === 0)
@@ -51,9 +53,10 @@ export function useProject(session: Session) {
     if (page.changes.length > 0) {
       setDocs((current) => {
         const next = applyRemote(current, page.changes)
-        if (phone && session.projectId) {
-          const stored = readPhoneCache(localStorage, session.projectId)
-          writePhoneCache(localStorage, session.projectId, { ops: stored.ops, docs: next })
+        if (session.projectId) {
+          const cache = { ops: box.current.ops, docs: next }
+          box.current = cache
+          void writeDurable(session.projectId, cache)
         }
         return next
       })
@@ -65,12 +68,12 @@ export function useProject(session: Session) {
   }, [phone, session])
 
   const flushPending = useCallback(async () => {
-    if (!phone || !session.projectId) return
+    if (!session.projectId) return
     const projectId = session.projectId
     let guard = 0
     while (guard < 20) {
       guard += 1
-      const cache = readPhoneCache(localStorage, projectId)
+      const cache = box.current
       if (cache.ops.length === 0) {
         setPending(0)
         return
@@ -88,26 +91,34 @@ export function useProject(session: Session) {
       }
       if (done.size === 0) return
       const left = forgetOps(cache.ops, done)
-      writePhoneCache(localStorage, projectId, { ops: left, docs: cache.docs })
+      const next = { ops: left, docs: box.current.docs }
+      box.current = next
+      await writeDurable(projectId, next)
       setPending(left.length)
       await pull()
       if (left.length === 0) return
     }
-  }, [phone, pull, session])
+  }, [pull, session])
 
   useEffect(() => {
     let cancelled = false
-    const stored = phone && session.projectId ? readPhoneCache(localStorage, session.projectId) : { ops: [], docs: [] }
-    if (stored.docs.length > 0) setDocs(stored.docs)
-    else setLoading(true)
-    readAll(session)
-      .then((loaded) => {
-        if (cancelled) return
+    const loadStored = session.projectId ? readDurable(session.projectId) : Promise.resolve(box.current)
+    void loadStored.then((stored) => {
+      if (cancelled) return
+      box.current = stored
+      if (stored.docs.length > 0) setDocs(stored.docs)
+      setPending(stored.ops.length)
+      if (stored.docs.length === 0) setLoading(true)
+      return readAll(session)
+    }).then((loaded) => {
+        if (cancelled || !loaded) return
         if (loaded.schemaVersion !== 1) setUpgrade(true)
-        const ops = phone && session.projectId ? readPhoneCache(localStorage, session.projectId).ops : []
+        const ops = box.current.ops
         const merged = ops.length > 0 ? applyLocal(loaded.entities, ops) : loaded.entities
+        const cache = { ops, docs: merged }
+        box.current = cache
         setDocs(merged)
-        if (phone && session.projectId) writePhoneCache(localStorage, session.projectId, { ops, docs: merged })
+        if (session.projectId) void writeDurable(session.projectId, cache)
         setPending(ops.length)
         cursor.current = loaded.watermark
         undoStack.current = []
@@ -118,7 +129,7 @@ export function useProject(session: Session) {
         if (ops.length > 0) void flushPending().catch(() => setFailed(true))
       })
       .catch(() => {
-        if (!cancelled) setFailed(true)
+        if (!cancelled && box.current.docs.length === 0) setFailed(true)
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -134,7 +145,7 @@ export function useProject(session: Session) {
       if (event === "changes-available") void pull().catch(() => setFailed(true))
     })
     const timer = window.setInterval(() => {
-      const waiting = phone && session.projectId ? readPhoneCache(localStorage, session.projectId).ops.length : 0
+      const waiting = box.current.ops.length
       const job = waiting > 0 ? flushPending() : pull()
       void job.catch(() => setFailed(true))
     }, 20_000)
@@ -174,17 +185,17 @@ export function useProject(session: Session) {
         setUpgrade(true)
         return false
       }
-      // A phone keeps the edit. The same operation is sent again when the server answers.
-      if (phone && session.projectId) {
+      // Offline edits wait and are sent again with the same opId. The phone file is SQLite.
+      const offline = error instanceof TypeError
+      if (session.projectId && (phone || offline)) {
         const projectId = session.projectId
-        const cache = readPhoneCache(localStorage, projectId)
-        const ops = rememberOps(cache.ops, stamped)
-        setDocs((current) => {
-          const next = applyLocal(current, stamped)
-          writePhoneCache(localStorage, projectId, { ops, docs: next })
-          return next
-        })
+        const ops = rememberOps(box.current.ops, stamped)
+        const next = applyLocal(docs, stamped)
+        const cache = { ops, docs: next }
+        box.current = cache
+        setDocs(next)
         setPending(ops.length)
+        await writeDurable(projectId, cache)
         if (step) {
           undoStack.current.push(step)
           redoStack.current = []

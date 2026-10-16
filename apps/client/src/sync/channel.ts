@@ -7,7 +7,28 @@ export type LiveMessage = {
   body: { name?: unknown; longitude?: unknown; latitude?: unknown; sharing?: unknown; courseDeg?: unknown; trail?: unknown }
 }
 
-export type DeviceRow = { id: string; displayName: string }
+export type DeviceCommand = {
+  id: string
+  mode: "off" | "live" | "track" | "both"
+  expiresAt: string
+  ackedAt: string | null
+  result: string | null
+}
+
+export type DeviceRow = {
+  id: string
+  displayName: string
+  actualState: string
+  desiredState: string
+  lastSeenAt: string | null
+  command: DeviceCommand | null
+}
+
+export type SelfCommand = {
+  desired: string
+  controlled: boolean
+  command: DeviceCommand | null
+}
 
 function auth(session: Session): HeadersInit {
   return { Authorization: `Bearer ${session.token}`, "Content-Type": "application/json" }
@@ -43,6 +64,32 @@ export async function createEnrollment(session: Session): Promise<{ code: string
   const response = await fetch(`${session.server}/api/v1/projects/${session.projectId}/enrollments`, { method: "POST", headers: auth(session) })
   if (!response.ok) return null
   return (await response.json()) as { code: string; expiresAt: string }
+}
+
+export async function sendCommand(session: Session, deviceId: string, mode: "off" | "live" | "track" | "both"): Promise<boolean> {
+  if (!session.projectId) return false
+  const response = await fetch(`${session.server}/api/v1/projects/${session.projectId}/devices/${deviceId}/commands`, {
+    method: "POST",
+    headers: auth(session),
+    body: JSON.stringify({ mode }),
+  })
+  return response.ok
+}
+
+export async function readSelfCommand(session: Session): Promise<SelfCommand | null> {
+  if (!session.projectId) return null
+  const response = await fetch(`${session.server}/api/v1/projects/${session.projectId}/devices/self/command`, { headers: auth(session) })
+  if (!response.ok) return null
+  return (await response.json()) as SelfCommand
+}
+
+export async function reportSelf(session: Session, body: { commandId?: string; actual: string; result?: string; adopt?: boolean }): Promise<void> {
+  if (!session.projectId) return
+  await fetch(`${session.server}/api/v1/projects/${session.projectId}/devices/self/command`, {
+    method: "POST",
+    headers: auth(session),
+    body: JSON.stringify(body),
+  })
 }
 
 export async function removeDevice(session: Session, deviceId: string): Promise<void> {

@@ -35,6 +35,7 @@ import { LayerActions, LayerBrowser } from "./layers.js"
 import { groupedIds } from "./order.js"
 import { SendPanel } from "./send-panel.js"
 import { Sheet } from "./Sheet.js"
+import { useCommands } from "./use-commands.js"
 import { useLive } from "./use-live.js"
 import { useProject } from "./use-project.js"
 import { readHidden, writeHidden } from "./view-state.js"
@@ -70,6 +71,7 @@ function nameOf(payload: unknown): string {
 export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { session: Session; onDisconnect: () => void; onBack: (() => void) | null; onJoined: (session: Session) => void }) {
   const project = useProject(session)
   const live = useLive(session)
+  useCommands(session, live.sharing, live.recording, live.setSharing, live.setRecording)
   const surface = editOrigin().surface
   const mapRef = useRef<MapHandle>(null)
   const stageRef = useRef<HTMLDivElement>(null)
@@ -661,7 +663,7 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
         measuring={measuring}
         locating={locating}
         settingsOpen={devicesOpen}
-        disabled={project.loading || (surface !== "device" && project.failed)}
+        disabled={project.loading || (surface !== "device" && project.failed && project.model.layers.length === 0)}
         onLayers={() => {
           setPlacingLayerId(null)
           stopMeasure()

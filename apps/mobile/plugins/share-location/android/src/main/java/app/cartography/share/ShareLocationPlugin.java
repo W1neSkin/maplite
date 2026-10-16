@@ -93,6 +93,41 @@ public class ShareLocationPlugin extends Plugin {
     }
 
     @PluginMethod
+    public void locationAllowed(PluginCall call) {
+        JSObject result = new JSObject();
+        result.put("granted", getPermissionState("location") == PermissionState.GRANTED);
+        call.resolve(result);
+    }
+
+    @PluginMethod
+    public void allowRemote(PluginCall call) {
+        getContext().getSharedPreferences("share-location", android.content.Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean("remote", Boolean.TRUE.equals(call.getBoolean("allow", false)))
+            .commit();
+        call.resolve();
+    }
+
+    @PluginMethod
+    public void readOutbox(PluginCall call) {
+        try {
+            call.resolve(new JSObject(OutboxDb.read(getContext(), call.getString("projectId", ""))));
+        } catch (Exception error) {
+            call.reject("Could not read the queue");
+        }
+    }
+
+    @PluginMethod
+    public void writeOutbox(PluginCall call) {
+        try {
+            OutboxDb.write(getContext(), call.getString("projectId", ""), call.getString("body", "{\"ops\":[],\"docs\":[]}"));
+            call.resolve();
+        } catch (Exception error) {
+            call.reject("Could not write the queue");
+        }
+    }
+
+    @PluginMethod
     public void stop(PluginCall call) {
         getContext().stopService(new Intent(getContext(), ShareService.class));
         call.resolve();

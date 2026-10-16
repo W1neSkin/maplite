@@ -12,7 +12,8 @@
 ## This slice
 
 - The browser asks for a server address and a token. `Use the local demo` calls a localhost-only route that is off when `NODE_ENV=production`.
-- Pending phone edits are kept in the WebView store, not in a native SQLite file. They survive a force-stop. A browser edit is not queued.
+- Pending phone edits are kept in a SQLite file on the device. A browser edit is kept in the browser store when the network request fails, and sent later with the same operation id.
+- Remote start and stop have no push. The phone applies a command while the app is open, or while the location service is already running. After force-stop nothing runs until the app is opened. A command stays pending until the phone confirms it. No permission and remote control switched off are reported by the phone. Silence is shown as phone closed.
 - Live sharing on Android keeps running with the screen off through a foreground notification. It stops after force-stop. A recorded track is started on the phone itself and saved as a line layer. iOS background sharing is not built. Remote start and stop are not built.
 - The ring around the location dot is the accuracy the device reported. It is drawn on the ellipsoid, then projected with the map. It is not a guaranteed error.
 - A marked point stores the time and whether the reported radius was within 100 m. The location API does not name gps, fused, or network.

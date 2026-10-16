@@ -1,8 +1,10 @@
 import { useEffect, useState } from "react"
 import { formatWhen } from "../i18n/format.js"
 import { t } from "../i18n/translate.js"
-import { createEnrollment, readDevices, redeemCode, removeDevice, type DeviceRow } from "../sync/channel.js"
+import { createEnrollment, readDevices, redeemCode, removeDevice, sendCommand, type DeviceRow } from "../sync/channel.js"
 import { clientId, saveSession, type Session } from "./connection.js"
+import { deviceFace, nextMode } from "./device-status.js"
+import { rememberRemote, remoteAllowed, reportLocal } from "./use-commands.js"
 import { BasemapPack } from "./basemap-pack.js"
 import { CheckIcon, IconButton, PlusIcon, TrashIcon } from "./icons.js"
 import { ShareLocation } from "../platform/share-location.js"
@@ -31,7 +33,10 @@ export function DevicesPanel(props: {
   }
 
   useEffect(() => {
-    if (props.surface === "main") reload()
+    if (props.surface !== "main") return
+    reload()
+    const timer = window.setInterval(reload, 10_000)
+    return () => window.clearInterval(timer)
   }, [props.session, props.surface])
 
   return (
@@ -40,11 +45,12 @@ export function DevicesPanel(props: {
       {props.surface === "device" ? <DeviceName /> : null}
       {props.surface === "device" ? (
         <label className="flex items-center gap-2 text-sm">
-          <input type="checkbox" checked={props.sharing} onChange={(event) => props.onSharing(event.target.checked)} />
+          <input type="checkbox" checked={props.sharing} onChange={(event) => { props.onSharing(event.target.checked); reportLocal(props.session, event.target.checked, props.recording) }} />
           {t("shareLive")}
         </label>
       ) : null}
-      {props.surface === "device" ? <TrackRecord recording={props.recording} onRecording={props.onRecording} onSave={props.onSaveTrack} /> : null}
+      {props.surface === "device" ? <TrackRecord recording={props.recording} onRecording={(value) => { props.onRecording(value); reportLocal(props.session, props.sharing, value) }} onSave={props.onSaveTrack} /> : null}
+      {props.surface === "device" ? <RemoteSwitch /> : null}
       {props.surface === "main" ? (
         <>
           <div className="flex items-center gap-1">
@@ -67,12 +73,7 @@ export function DevicesPanel(props: {
           {expiresAt ? <p className="text-xs text-neutral-500">{t("enrollmentExpires", { time: formatWhen(expiresAt) })}</p> : null}
           <ul className="flex flex-col">
             {devices.map((device) => (
-              <li key={device.id} className="flex items-center">
-                <span className="min-w-0 flex-1 truncate px-1 text-sm">{device.displayName}</span>
-                <IconButton aria-label={t("removeDevice")} title={t("removeDevice")} onClick={() => void removeDevice(props.session, device.id).then(reload)}>
-                  <TrashIcon />
-                </IconButton>
-              </li>
+              <DeviceControl key={device.id} session={props.session} device={device} onChanged={reload} />
             ))}
           </ul>
         </>
@@ -108,6 +109,75 @@ export function DevicesPanel(props: {
         </form>
       ) : null}
     </div>
+  )
+}
+
+const FACE = {
+  pending: "devicePending",
+  closed: "deviceClosed",
+  permission: "devicePermission",
+  remoteOff: "deviceRemoteOff",
+  expired: "deviceExpired",
+  off: "deviceOff",
+  live: "deviceLive",
+  track: "deviceRecording",
+  both: "deviceBoth",
+} as const
+
+function DeviceControl(props: { session: Session; device: DeviceRow; onChanged: () => void }) {
+  const face = deviceFace({
+    desired: props.device.desiredState ?? "off",
+    actual: props.device.actualState ?? "off",
+    lastSeenAt: props.device.lastSeenAt ?? null,
+    ackedAt: props.device.command?.ackedAt ?? null,
+    result: props.device.command?.result ?? null,
+    expiresAt: props.device.command?.expiresAt ?? null,
+    now: Date.now(),
+  })
+  const desired = props.device.desiredState ?? "off"
+  function send(button: "off" | "live" | "track") {
+    void sendCommand(props.session, props.device.id, nextMode(desired, button)).then(() => props.onChanged())
+  }
+  return (
+    <li className="flex flex-col gap-1 py-1">
+      <div className="flex items-center">
+        <span className="min-w-0 flex-1 truncate px-1 text-sm">{props.device.displayName}</span>
+        <span className="shrink-0 px-1 text-xs text-neutral-500">{t(FACE[face])}</span>
+        <IconButton aria-label={t("removeDevice")} title={t("removeDevice")} onClick={() => void removeDevice(props.session, props.device.id).then(() => props.onChanged())}>
+          <TrashIcon />
+        </IconButton>
+      </div>
+      <div className="flex gap-1 px-1">
+        <ModeButton label={t("deviceOff")} pressed={desired === "off"} onClick={() => send("off")} />
+        <ModeButton label={t("deviceLive")} pressed={desired === "live" || desired === "both"} onClick={() => send("live")} />
+        <ModeButton label={t("deviceTrack")} pressed={desired === "track" || desired === "both"} onClick={() => send("track")} />
+      </div>
+    </li>
+  )
+}
+
+function ModeButton(props: { label: string; pressed: boolean; onClick: () => void }) {
+  return (
+    <button type="button" className={props.pressed ? "h-8 rounded-full bg-neutral-900 px-2 text-xs text-white" : "h-8 rounded-full bg-black/5 px-2 text-xs"} aria-pressed={props.pressed} onClick={props.onClick}>
+      {props.label}
+    </button>
+  )
+}
+
+function RemoteSwitch() {
+  const [allow, setAllow] = useState(remoteAllowed)
+  return (
+    <label className="flex items-center gap-2 text-sm">
+      <input
+        type="checkbox"
+        checked={allow}
+        onChange={(event) => {
+          setAllow(event.target.checked)
+          rememberRemote(event.target.checked)
+        }}
+      />
+      {t("allowRemote")}
+    </label>
   )
 }
 

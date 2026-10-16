@@ -9,7 +9,7 @@ function key(projectId: string): string {
   return `cartography.phoneQueue.${projectId}`
 }
 
-/** The phone WebView keeps this storage across a force-stop. The browser does not use it. */
+/** Browser queue, and the phone's fallback when the SQLite file cannot be opened. */
 export function readPhoneCache(storage: Storage, projectId: string): PhoneCache {
   try {
     const raw = storage.getItem(key(projectId))
@@ -22,6 +22,10 @@ export function readPhoneCache(storage: Storage, projectId: string): PhoneCache 
   } catch {
     return empty
   }
+}
+
+export function removePhoneCache(storage: Storage, projectId: string): void {
+  storage.removeItem(key(projectId))
 }
 
 export function writePhoneCache(storage: Storage, projectId: string, cache: PhoneCache): void {

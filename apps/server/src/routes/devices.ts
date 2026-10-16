@@ -4,10 +4,50 @@ import type { AppEnv } from "../app-env.js"
 import type { ServerConfig } from "../config.js"
 import type { AppDatabase } from "../db/open.js"
 import { apiError, invalidToken } from "../http.js"
+import { ackCommand, issueCommand, readSelfCommand } from "../services/commands.js"
 import { createEnrollment, listDevices, redeemEnrollment, removeDevice } from "../services/enrollment.js"
 
 export function deviceRoutes(db: AppDatabase, config: ServerConfig): Hono<AppEnv> {
   const routes = new Hono<AppEnv>()
+
+  routes.get("/api/v1/projects/:projectId/devices/self/command", (c) => {
+    const projectId = c.req.param("projectId")
+    const access = accessFor(db, config, c.req.header("authorization"))
+    if (!canWriteProject(access, projectId) || access?.role !== "project" || access.kind !== "device" || !access.deviceId) return invalidToken(c)
+    const self = readSelfCommand(db, projectId, access.deviceId)
+    if (!self) return invalidToken(c)
+    return c.json(self)
+  })
+
+  routes.post("/api/v1/projects/:projectId/devices/self/command", async (c) => {
+    const projectId = c.req.param("projectId")
+    const access = accessFor(db, config, c.req.header("authorization"))
+    if (!canWriteProject(access, projectId) || access?.role !== "project" || access.kind !== "device" || !access.deviceId) return invalidToken(c)
+    const body = (await c.req.json().catch(() => null)) as { commandId?: unknown; actual?: unknown; result?: unknown; adopt?: unknown } | null
+    if (!body || typeof body.actual !== "string") return apiError(c, 400, "validation", "Device state is required")
+    const ok = ackCommand(db, projectId, access.deviceId, {
+      commandId: typeof body.commandId === "string" ? body.commandId : null,
+      actual: body.actual,
+      result: typeof body.result === "string" ? body.result : null,
+      adopt: body.adopt === true,
+    })
+    if (!ok) return invalidToken(c)
+    return c.json({ accepted: true })
+  })
+
+  routes.post("/api/v1/projects/:projectId/devices/:deviceId/commands", async (c) => {
+    const projectId = c.req.param("projectId")
+    const access = accessFor(db, config, c.req.header("authorization"))
+    const editor = access?.role === "project" && access.kind === "editor" && access.projectId === projectId
+    if (!access || (access.role !== "admin" && !editor)) return invalidToken(c)
+    const body = (await c.req.json().catch(() => null)) as { mode?: unknown } | null
+    if (!body || (body.mode !== "off" && body.mode !== "live" && body.mode !== "track" && body.mode !== "both")) {
+      return apiError(c, 400, "validation", "Command mode is required")
+    }
+    const issued = issueCommand(db, projectId, c.req.param("deviceId"), body.mode)
+    if (!issued) return apiError(c, 404, "not_found", "Device was not found")
+    return c.json(issued, 201)
+  })
 
   routes.get("/api/v1/projects/:projectId/devices", (c) => {
     const projectId = c.req.param("projectId")

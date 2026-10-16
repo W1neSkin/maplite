@@ -38,6 +38,7 @@ public class ShareService extends Service implements LocationListener {
     private final Handler handler = new Handler(Looper.getMainLooper());
     private Location last;
     private long lastSentAt;
+    private int polls;
     private boolean posting = true;
 
     static void save(Context context, String server, String token, String projectId, String subjectId, String name) {
@@ -92,9 +93,22 @@ public class ShareService extends Service implements LocationListener {
         public void run() {
             boolean share = getSharedPreferences(PREFS, MODE_PRIVATE).getBoolean("share", false);
             if (share && last != null && System.currentTimeMillis() - lastSentAt >= HEARTBEAT_MS) send(last, false);
+            polls += 1;
+            if (polls % 4 == 0) posts.execute(() -> followRemote());
             handler.postDelayed(this, 5_000);
         }
     };
+
+    /** A command that arrived with the screen off. Null means nothing to change. */
+    private void followRemote() {
+        String mode = RemotePoll.poll(this);
+        if (mode == null) return;
+        handler.post(() -> {
+            NotificationManager manager = getSystemService(NotificationManager.class);
+            if (manager != null) manager.notify(NOTICE, notice());
+            if ("off".equals(mode)) stopSelf();
+        });
+    }
 
     @SuppressLint("MissingPermission")
     private void listen() {
