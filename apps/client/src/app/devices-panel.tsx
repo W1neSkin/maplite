@@ -3,7 +3,6 @@ import { formatWhen } from "../i18n/format.js"
 import { t } from "../i18n/translate.js"
 import { createEnrollment, readDevices, redeemCode, removeDevice, renameSelf, sendCommand, type DeviceRow } from "../sync/channel.js"
 import { clientId, saveSession, type Session } from "./connection.js"
-import { qrForPage } from "./enrollment.js"
 import { deviceFace, nextMode } from "./device-status.js"
 import { rememberRemote, remoteAllowed, reportLocal } from "./use-commands.js"
 import { BasemapPack } from "./basemap-pack.js"
@@ -92,7 +91,7 @@ export function DevicesPanel(props: {
               onClick={() => {
                 void createEnrollment(props.session).then((issued) => {
                   if (!issued) return
-                  setQrText(qrForPage(issued.qrText))
+                  setQrText(issued.qrText)
                   setExpiresAt(issued.expiresAt)
                 })
               }}

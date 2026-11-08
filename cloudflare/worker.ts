@@ -5,9 +5,7 @@ import { runPendingMigrations } from "../apps/server/src/db/migrate.js"
 import { seedDemo } from "../apps/server/src/services/demo.js"
 import { LATEST_WORKER_MIGRATION, WORKER_MIGRATIONS, openWorkerDatabase } from "./sqlite.js"
 
-const PUBLIC_URL = "https://maplite.map.example"
 const CORS_ORIGINS = [
-  PUBLIC_URL,
   "http://127.0.0.1:3848",
   "http://localhost:3848",
   "https://localhost",
@@ -22,6 +20,7 @@ type WorkerEnv = {
     get(id: unknown): { fetch(request: Request): Promise<Response> }
   }
   ADMIN_TOKEN?: string
+  PUBLIC_BASE_URL?: string
   SEED_DEMO?: string
 }
 
@@ -39,8 +38,8 @@ export class MapliteServer extends DurableObject<WorkerEnv> {
     const config = loadConfig({
       NODE_ENV: "production",
       ADMIN_TOKEN: env.ADMIN_TOKEN,
-      PUBLIC_BASE_URL: PUBLIC_URL,
-      CORS_ORIGINS,
+      PUBLIC_BASE_URL: env.PUBLIC_BASE_URL,
+      CORS_ORIGINS: env.PUBLIC_BASE_URL ? `${env.PUBLIC_BASE_URL},${CORS_ORIGINS}` : CORS_ORIGINS,
       SEED_DEMO: env.SEED_DEMO ?? "false",
       ALLOW_DEV_CREDENTIALS_FILE: "false",
     })

@@ -14,16 +14,3 @@ export function readEnrollment(raw: string): { code: string; serverUrl: string |
   }
   return { code: text, serverUrl: null }
 }
-
-const PHONE_SERVER = "https://maplite.map.example"
-
-/** The phone must open the permanent address, not a temporary tunnel name. */
-export function qrForPage(qrText: string): string {
-  try {
-    const parsed = JSON.parse(qrText) as { code?: unknown }
-    if (typeof parsed.code !== "string") return qrText
-    return JSON.stringify({ code: parsed.code, serverUrl: PHONE_SERVER })
-  } catch {
-    return qrText
-  }
-}

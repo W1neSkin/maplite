@@ -33,7 +33,7 @@ describe("worker sqlite adapter", () => {
     const config = loadConfig({
       NODE_ENV: "production",
       ADMIN_TOKEN: adminToken,
-      PUBLIC_BASE_URL: "https://maplite.map.example",
+      PUBLIC_BASE_URL: "https://map.example",
       SEED_DEMO: "false",
       ALLOW_DEV_CREDENTIALS_FILE: "false",
     })
