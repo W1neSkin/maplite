@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from "react"
 import { t } from "../i18n/translate.js"
 import { clearTiles, storeZip, tileCount } from "../map/tile-cache.js"
-import { ImportIcon, IconButton, TrashIcon } from "./icons.js"
+import { DownloadIcon, IconButton, ImportIcon, TrashIcon } from "./icons.js"
 
-export function BasemapPack() {
+export function BasemapPack(props: { onSaveView: () => Promise<number> }) {
   const input = useRef<HTMLInputElement>(null)
   const [count, setCount] = useState(0)
   const [busy, setBusy] = useState(false)
@@ -12,6 +12,12 @@ export function BasemapPack() {
   }, [])
   return (
     <div className="flex items-center gap-1">
+      <IconButton tone="fill" aria-label={t("saveView")} title={t("saveView")} disabled={busy} onClick={() => {
+        setBusy(true)
+        void props.onSaveView().then(setCount).finally(() => setBusy(false))
+      }}>
+        <DownloadIcon />
+      </IconButton>
       <IconButton tone="fill" aria-label={t("loadBasemap")} title={t("loadBasemap")} disabled={busy} onClick={() => input.current?.click()}>
         <ImportIcon />
       </IconButton>

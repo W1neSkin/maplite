@@ -1,4 +1,5 @@
 import { projectedToCrs84, sourceGeographicToCrs84 } from "@cartography/geo-core"
+import { loadTrackText } from "./gpx-kml.js"
 import { unzipSync } from "fflate"
 import type { Crs84Geometry } from "@cartography/project-schema"
 import { hasHighBytes, readDbf, readShp, type RawGeometry } from "./shp.js"
@@ -165,6 +166,7 @@ function fromShapefile(group: Group, options: LoadOptions = {}): ImportOutcome {
 }
 
 export function loadBytes(name: string, bytes: Uint8Array, options: LoadOptions = {}): ImportOutcome {
+  if (/\.gpx$/i.test(name) || /\.kml$/i.test(name)) return loadTrackText(name, text(bytes))
   if (/\.geojson$/i.test(name) || /\.json$/i.test(name)) return fromGeoJson(name, text(bytes))
   let files: Record<string, Uint8Array>
   try {

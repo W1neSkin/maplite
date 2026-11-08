@@ -23,7 +23,8 @@ import { CoordBar } from "./coords.js"
 import { MapDock, MeasureBar, PlacingBar, SyncActions } from "./dock.js"
 import { ImportBody } from "./import-sheet.js"
 import { loadBytes, type ImportOutcome } from "../import/load.js"
-import { saveZip } from "../import/save-zip.js"
+import { layerGpx, layerKml } from "../import/gpx-kml.js"
+import { saveText, saveZip } from "../import/save-zip.js"
 import { layerZip } from "../import/write-shp.js"
 import { formatLength } from "../i18n/format.js"
 import { t } from "../i18n/translate.js"
@@ -66,6 +67,13 @@ function nameOf(payload: unknown): string {
   if (!payload || typeof payload !== "object") return ""
   const name = (payload as { properties?: { name?: unknown } }).properties?.name
   return typeof name === "string" ? name : ""
+}
+
+function namedRecords(features: readonly { id: string; geometry: { type: "Point"; coordinates: [number, number] } | { type: "LineString"; coordinates: [number, number][] } | { type: "Polygon"; coordinates: [number, number][][] }; properties: { name?: unknown } }[]) {
+  return features.map((feature) => ({
+    name: typeof feature.properties.name === "string" && feature.properties.name ? feature.properties.name : feature.id,
+    geometry: feature.geometry,
+  }))
 }
 
 export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { session: Session; onDisconnect: () => void; onBack: (() => void) | null; onJoined: (session: Session) => void }) {
@@ -476,6 +484,14 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
                 const file = layerZip(openLayer.name, openLayer.geometryType, project.recordsIn(openLayer.id))
                 void saveZip(file.filename, file.bytes)
               }}
+              onGpx={() => {
+                const file = layerGpx(openLayer.name, namedRecords(project.recordsIn(openLayer.id)))
+                void saveText(file.filename, file.text, "application/gpx+xml")
+              }}
+              onKml={() => {
+                const file = layerKml(openLayer.name, namedRecords(project.recordsIn(openLayer.id)))
+                void saveText(file.filename, file.text, "application/vnd.google-earth.kml+xml")
+              }}
               onDelete={() => void project.deleteLayer(openLayer.id).then((ok) => { if (!ok) return; if (openLayerId === openLayer.id) setOpenLayerId(null); setSelectedId(null) })}
             />
           ) : null}
@@ -490,6 +506,7 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
               onSharing={live.setSharing}
               recording={live.recording}
               onRecording={live.setRecording}
+              onSaveView={() => mapRef.current?.saveView() ?? Promise.resolve(0)}
               onSaveTrack={async () => {
                 let points: [number, number][] = []
                 try {
@@ -608,6 +625,13 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
             onBuildPolygon={() => void buildShape("Polygon")}
             livePeople={live.people}
             onTogglePerson={live.togglePerson}
+            onShowPerson={(id) => {
+              const person = live.people.find((item) => item.id === id)
+              if (!person) return
+              setOpenLayerId(null)
+              setSheet(false)
+              mapRef.current?.showAt(person.coordinate)
+            }}
           />
           </>
           )}
@@ -627,7 +651,7 @@ export function ProjectScreen({ session, onDisconnect, onBack, onJoined }: { ses
       <input
         ref={fileRef}
         type="file"
-        accept=".zip,.geojson,.json,application/zip,application/geo+json"
+        accept=".zip,.geojson,.json,.gpx,.kml,application/zip,application/geo+json"
         className="hidden"
         onChange={(event) => {
           const file = event.target.files?.[0]

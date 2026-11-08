@@ -23,7 +23,7 @@ import VectorSource from "ol/source/Vector"
 import { t } from "../i18n/translate.js"
 import type { MapFeature } from "../app/model.js"
 import { DEV_BASEMAP_URL } from "./basemap.js"
-import { readTile, rememberTile, watchTiles } from "./tile-cache.js"
+import { readTile, rememberTile, storeViewTiles, viewTileKeys, watchTiles } from "./tile-cache.js"
 import { FRAME_MARGIN, extentToScreen, frameFeature, panToCenterDelta } from "./frame.js"
 import { HERE_ZOOM, hereStyle, placeHere, readPosition, type HereFix } from "./here.js"
 import type { PositionProblem } from "./position.js"
@@ -39,6 +39,8 @@ export type MapHandle = {
   fit(): void
   fitBox(box: [number, number, number, number]): void
   show(id: string, padding: [number, number, number, number]): void
+  showAt(coordinate: [number, number]): void
+  saveView(): Promise<number>
   locate(): Promise<HereFix | PositionProblem>
 }
 
@@ -471,6 +473,24 @@ export const MapView = forwardRef<MapHandle, MapViewProps>(function MapView({ fe
       const source = sourceRef.current
       if (!map || !source) return
       showFeature(map, source, id, padding)
+    },
+    showAt(coordinate: [number, number]) {
+      const map = mapRef.current
+      if (!map) return
+      const view = map.getView()
+      view.cancelAnimations()
+      const zoom = view.getZoom()
+      view.animate({ center: viewFromLonLat(map, coordinate), zoom: Math.max(typeof zoom === "number" ? zoom : 16, 16), duration: 200 })
+    },
+    async saveView() {
+      const map = mapRef.current
+      const size = map?.getSize()
+      if (!map || !size) return 0
+      const extent = map.getView().calculateExtent(size)
+      const southWest = lonLatFromView(map, [extent[0] ?? 0, extent[1] ?? 0])
+      const northEast = lonLatFromView(map, [extent[2] ?? 0, extent[3] ?? 0])
+      const zoom = map.getView().getZoom() ?? 14
+      return storeViewTiles(viewTileKeys(southWest, northEast, zoom))
     },
     async locate() {
       const map = mapRef.current

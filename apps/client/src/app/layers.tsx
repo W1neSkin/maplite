@@ -37,6 +37,7 @@ type LayerBrowserProps = {
   onBuildPolygon: () => void
   livePeople: readonly LivePerson[]
   onTogglePerson: (id: string) => void
+  onShowPerson: (id: string) => void
 }
 
 function buckets(layers: readonly MapLayer[], groups: readonly MapGroup[]) {
@@ -49,7 +50,7 @@ export function LayerBrowser(props: LayerBrowserProps) {
   const [query, setQuery] = useState("")
   const layer = props.layers.find((item) => item.id === props.openLayerId) ?? null
   if (props.openLayerId === LIVE_DEVICE_LAYER) {
-    return <LiveLayerBody people={props.livePeople} onToggle={props.onTogglePerson} />
+    return <LiveLayerBody people={props.livePeople} onToggle={props.onTogglePerson} onShow={props.onShowPerson} />
   }
   if (!layer) {
     return (
@@ -326,7 +327,7 @@ function NewLayer(props: { groups: readonly MapGroup[]; onCreate: (name: string,
   )
 }
 
-export function LayerActions(props: { geometryType: MapLayer["geometryType"]; color: string; styleOpen: boolean; locked: boolean; onStyle: () => void; onAdd: () => void; onSend?: () => void; onExport: () => void; onDelete: () => void }) {
+export function LayerActions(props: { geometryType: MapLayer["geometryType"]; color: string; styleOpen: boolean; locked: boolean; onStyle: () => void; onAdd: () => void; onSend?: () => void; onExport: () => void; onGpx: () => void; onKml: () => void; onDelete: () => void }) {
   return (
     <>
       {props.locked ? null : (
@@ -346,6 +347,12 @@ export function LayerActions(props: { geometryType: MapLayer["geometryType"]; co
       ) : null}
       <IconButton tone="fill" aria-label={t("exportLayer")} title={t("exportLayer")} onClick={props.onExport}>
         <ExportIcon />
+      </IconButton>
+      <IconButton tone="fill" aria-label={t("exportGpx")} title={t("exportGpx")} onClick={props.onGpx}>
+        <span className="text-[10px] font-semibold">GPX</span>
+      </IconButton>
+      <IconButton tone="fill" aria-label={t("exportKml")} title={t("exportKml")} onClick={props.onKml}>
+        <span className="text-[10px] font-semibold">KML</span>
       </IconButton>
       {props.locked ? null : (
         <IconButton tone="fill" aria-label={t("deleteLayer")} title={t("deleteLayer")} onClick={props.onDelete}>

@@ -1,5 +1,5 @@
 import { t } from "../i18n/translate.js"
-import { EyeIcon, EyeOffIcon, IconButton } from "./icons.js"
+import { EyeIcon, EyeOffIcon, IconButton, LocateIcon } from "./icons.js"
 import type { LivePerson } from "./use-live.js"
 
 /** One dynamic type is one layer. This id is local and is not a project record. */
@@ -21,7 +21,7 @@ export function LiveLayerRow(props: { count: number; hidden: boolean; onToggle: 
   )
 }
 
-export function LiveLayerBody(props: { people: readonly LivePerson[]; onToggle: (id: string) => void }) {
+export function LiveLayerBody(props: { people: readonly LivePerson[]; onToggle: (id: string) => void; onShow: (id: string) => void }) {
   return (
     <ul className="flex flex-col">
       {props.people.map((person) => (
@@ -30,6 +30,9 @@ export function LiveLayerBody(props: { people: readonly LivePerson[]; onToggle: 
             {person.shown ? <EyeIcon /> : <EyeOffIcon />}
           </IconButton>
           <span className="min-w-0 flex-1 truncate px-1 text-sm">{person.name}</span>
+          <IconButton aria-label={t("showPerson")} title={t("showPerson")} onClick={() => props.onShow(person.id)}>
+            <LocateIcon />
+          </IconButton>
         </li>
       ))}
     </ul>

@@ -27,7 +27,7 @@ function trailOf(value: unknown): [number, number][] {
   }
   return points
 }
-export type LivePerson = { id: string; name: string; shown: boolean }
+export type LivePerson = { id: string; name: string; shown: boolean; coordinate: [number, number] }
 
 function readSet(key: string): Set<string> {
   try {
@@ -88,7 +88,7 @@ function deviceMessages(messages: readonly LiveMessage[], now: number, hidden: R
     if (!Number.isFinite(age) || age > DROP_MS) continue
     const name = typeof message.body.name === "string" && message.body.name.trim() ? message.body.name : message.id
     const shown = !hidden.has(message.id)
-    people.push({ id: message.id, name, shown })
+    people.push({ id: message.id, name, shown, coordinate: [longitude, latitude] })
     const course = message.body.courseDeg
     if (shown) markers.push({
       id: message.id,

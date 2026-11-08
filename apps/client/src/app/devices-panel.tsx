@@ -21,6 +21,7 @@ export function DevicesPanel(props: {
   onSharing: (value: boolean) => void
   recording: boolean
   onRecording: (value: boolean) => void
+  onSaveView: () => Promise<number>
   onSaveTrack: () => Promise<void>
   onJoined: (session: Session) => void
 }) {
@@ -72,7 +73,7 @@ export function DevicesPanel(props: {
           }}
         />
       ) : null}
-      {scanning ? null : <BasemapPack />}
+      {scanning ? null : <BasemapPack onSaveView={props.onSaveView} />}
       {props.surface === "device" && !scanning ? <DeviceName session={props.session} /> : null}
       {props.surface === "device" && !scanning ? (
         <label className="flex items-center gap-2 text-sm">
@@ -109,7 +110,7 @@ export function DevicesPanel(props: {
           </ul>
         </>
       ) : null}
-      {props.surface === "device" && props.session.kind !== "device" && !scanning ? (
+      {props.surface === "device" && !scanning ? (
         <div className="flex flex-col gap-1">
           <button type="button" className="h-8 rounded-full bg-black/5 px-3 text-sm" disabled={joining} onClick={() => setScanning(true)}>{joining ? t("joining") : t("scanCode")}</button>
           {joinFailed ? <p className="px-1 text-xs text-neutral-500">{t("joinFailed")}</p> : null}
