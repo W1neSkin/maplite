@@ -4,6 +4,8 @@ A shared map for a browser and an Android phone. Several people work in one proj
 
 The phone app is named **MapLite**.
 
+![MapLite on Android: a route and open ground over Hyde Park, with the layer list open](docs/maplite-phone.jpg)
+
 ## What you can do
 
 - Draw and edit points, lines, and polygons. A line or polygon is built in the order of the point list, and rebuilding it replaces the previous shape.
