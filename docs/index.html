@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MapLite — shared map for a browser and Android</title>
+  <meta name="description" content="MapLite is a shared field map. Draw points, lines, and polygons, import GPX, KML, and shapefile, and follow live GPS from an Android phone in the browser." />
+  <link rel="icon" href="images/icon.jpg" />
+  <link rel="canonical" href="https://w1neskin.github.io/maplite/" />
+  <meta property="og:title" content="MapLite — shared map for a browser and Android" />
+  <meta property="og:description" content="One project for the desk and the phone: layers, drawings, GPX and KML, and live GPS." />
+  <meta property="og:image" content="https://w1neskin.github.io/maplite/maplite-phone.jpg" />
+  <meta property="og:url" content="https://w1neskin.github.io/maplite/" />
+  <meta property="og:type" content="website" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <script type="application/ld+json">
+  {
+    "@context": "https://schema.org",
+    "@type": "SoftwareApplication",
+    "name": "MapLite",
+    "applicationCategory": "BusinessApplication",
+    "operatingSystem": "Android, Web",
+    "offers": { "@type": "Offer", "price": "0", "priceCurrency": "USD" },
+    "description": "Shared field map for a browser and an Android phone. Layers, drawings, GPX, KML, shapefile, and live GPS.",
+    "url": "https://w1neskin.github.io/maplite/",
+    "codeRepository": "https://github.com/W1neSkin/maplite"
+  }
+  </script>
+  <style>
+    :root {
+      --bg: #10131c;
+      --card: #171b27;
+      --card-2: #222838;
+      --text: #f4f6fb;
+      --muted: #a3adC2;
+      --coral: #ff7a59;
+      --green: #2f6b4f;
+      --line: rgba(244, 246, 251, 0.08);
+      --shadow: 0 24px 60px rgba(0, 0, 0, 0.35);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body {
+      margin: 0;
+      background:
+        radial-gradient(900px 420px at 88% -8%, rgba(255, 122, 89, 0.16), transparent 58%),
+        radial-gradient(700px 380px at -8% 18%, rgba(47, 107, 79, 0.16), transparent 55%),
+        var(--bg);
+      color: var(--text);
+      font-family: Inter, system-ui, sans-serif;
+      line-height: 1.55;
+    }
+    a { color: inherit; }
+    img { max-width: 100%; height: auto; display: block; }
+    .wrap { width: min(1080px, calc(100% - 32px)); margin: 0 auto; }
+    header {
+      position: sticky; top: 0; z-index: 5;
+      backdrop-filter: blur(16px);
+      background: rgba(16, 19, 28, 0.78);
+      border-bottom: 1px solid var(--line);
+    }
+    .bar { display: flex; align-items: center; gap: 16px; height: 64px; }
+    .brand { display: flex; align-items: center; gap: 10px; font-weight: 650; letter-spacing: -0.03em; text-decoration: none; }
+    .mark { width: 28px; height: 28px; border-radius: 7px; display: block; flex: none; }
+    nav { margin-left: auto; display: flex; gap: 18px; align-items: center; }
+    nav a { color: var(--muted); text-decoration: none; font-size: 14px; }
+    nav a:hover { color: var(--text); }
+    .hero { padding: 64px 0 24px; display: grid; grid-template-columns: 1.15fr 0.85fr; gap: 40px; align-items: center; }
+    .eyebrow { color: var(--coral); font-size: 13px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; margin: 0 0 12px; }
+    h1 { font-size: clamp(36px, 5vw, 58px); line-height: 1.02; letter-spacing: -0.045em; margin: 0 0 16px; }
+    .lede { color: var(--muted); font-size: 18px; margin: 0 0 24px; max-width: 46ch; }
+    .actions { display: flex; flex-wrap: wrap; gap: 12px; align-items: center; }
+    .btn {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-height: 48px; padding: 0 18px; border-radius: 14px; text-decoration: none;
+      font-weight: 600; border: 1px solid transparent;
+    }
+    .btn.primary { background: var(--coral); color: #1a1020; }
+    .btn.ghost { border-color: var(--line); color: var(--text); background: rgba(255,255,255,0.03); }
+    .fine { color: var(--muted); font-size: 13px; margin-top: 12px; }
+    .phone {
+      justify-self: center;
+      width: min(320px, 100%);
+      background: #0c0e14;
+      border-radius: 36px;
+      padding: 10px;
+      border: 1px solid var(--line);
+      box-shadow: var(--shadow);
+    }
+    .phone img { border-radius: 28px; }
+    section { padding: 28px 0; }
+    h2 { font-size: 32px; letter-spacing: -0.04em; margin: 0 0 8px; }
+    .sub { color: var(--muted); margin: 0 0 22px; max-width: 66ch; }
+    .grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 14px; }
+    .card {
+      background: var(--card); border: 1px solid var(--line); border-radius: 22px; padding: 18px 18px 16px;
+    }
+    .card h3 { margin: 0 0 8px; font-size: 18px; letter-spacing: -0.03em; }
+    .card p, .card li { color: var(--muted); font-size: 15px; }
+    .card ul { margin: 0; padding-left: 18px; }
+    .steps { display: grid; gap: 10px; }
+    .step { display: grid; grid-template-columns: 36px 1fr; gap: 12px; align-items: start; }
+    .num {
+      width: 36px; height: 36px; border-radius: 12px; background: var(--card-2);
+      display: grid; place-items: center; font-weight: 700; color: var(--coral);
+    }
+    footer {
+      border-top: 1px solid var(--line); margin-top: 28px; padding: 28px 0 80px; color: var(--muted); font-size: 14px;
+    }
+    footer a { color: var(--text); }
+    @media (max-width: 860px) {
+      .hero, .grid { grid-template-columns: 1fr; }
+      nav .quiet { display: none; }
+      header { position: static; }
+      .hero { padding-top: 32px; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="wrap bar">
+      <a class="brand" href="#top"><img class="mark" src="images/icon.jpg" alt="" /> MapLite</a>
+      <nav>
+        <a class="quiet" href="#work">On the map</a>
+        <a class="quiet" href="#phone">Phone</a>
+        <a href="https://github.com/W1neSkin/maplite">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main id="top" class="wrap">
+    <div class="hero">
+      <div>
+        <p class="eyebrow">Browser and Android</p>
+        <h1>A shared map for the desk and the field</h1>
+        <p class="lede">Several people work in one project. Points, lines, polygons, and live GPS stay together and sync through one server.</p>
+        <div class="actions">
+          <a class="btn primary" href="https://github.com/W1neSkin/maplite">View on GitHub</a>
+          <a class="btn ghost" href="#phone">How a phone joins</a>
+        </div>
+        <p class="fine">Open source. No accounts. A project is opened with a token, never with a password in the address.</p>
+      </div>
+      <div class="phone">
+        <img src="maplite-phone.jpg" alt="MapLite on Android over Hyde Park: a route, a polygon, and the layer list" />
+      </div>
+    </div>
+
+    <section id="work">
+      <h2>What you do on the map</h2>
+      <p class="sub">The picture under the data is OpenStreetMap. Measurements do not treat that picture as a survey control.</p>
+      <div class="grid">
+        <article class="card">
+          <h3>Draw</h3>
+          <p>Add points, lines, and polygons. A line or polygon follows the point list, and building it again replaces the previous shape.</p>
+        </article>
+        <article class="card">
+          <h3>Bring files in</h3>
+          <p>Import a shapefile zip, GeoJSON, GPX, or KML. Export a layer back out as a shapefile, GPX, or KML.</p>
+        </article>
+        <article class="card">
+          <h3>Measure</h3>
+          <p>Length and area are geodesic. A polygon that crosses itself is reported, instead of being given a misleading area.</p>
+        </article>
+        <article class="card">
+          <h3>Live GPS</h3>
+          <p>A phone can share its position. The mark fades after 30 seconds and drops after 2 minutes. Recording a track is a separate switch, and it keeps writing while the screen is off.</p>
+        </article>
+        <article class="card">
+          <h3>Work offline</h3>
+          <p>Edits made without a network are stored and sent later. The same edit is not applied twice. The current map view can be saved for offline, up to 4000 tiles.</p>
+        </article>
+        <article class="card">
+          <h3>Coordinates</h3>
+          <p>Positions are stored as longitude and latitude. The display can show WGS 84 or a registered 6° Gauss–Krüger zone of SK-42, SK-95, or GSK-2011. A local drawing can be seated with control points.</p>
+        </article>
+      </div>
+    </section>
+
+    <section id="phone">
+      <h2>Put a phone on the same map</h2>
+      <p class="sub">The Android app is MapLite. It asks for the camera as soon as it opens, because the first job is to join a project.</p>
+      <div class="steps">
+        <div class="step"><div class="num">1</div><div>On the computer, open the project and choose Settings, then Add device. That shows a QR code.</div></div>
+        <div class="step"><div class="num">2</div><div>Open MapLite. The camera is already on. Scan that code. It works once and expires after 10 minutes.</div></div>
+        <div class="step"><div class="num">3</div><div>The phone remembers the project. The next launch opens the map, not the scanner.</div></div>
+      </div>
+      <p class="fine">From the computer you can ask a phone to start or stop live sharing and track recording. The phone has to allow remote control, and a command waits until the app is open.</p>
+    </section>
+
+    <section>
+      <h2>Run it yourself</h2>
+      <div class="card">
+        <ul>
+          <li>The source is on GitHub. Node.js 22 or newer, then <code>corepack pnpm install</code> and <code>corepack pnpm dev</code>.</li>
+          <li>The map opens at http://127.0.0.1:3848. The API listens on port 3847.</li>
+          <li>The same server can run on Cloudflare Workers, with the database in one SQLite Durable Object. The steps are in the README.</li>
+          <li>There is no iOS build in this repository.</li>
+        </ul>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    <div class="wrap">
+      <p><a href="https://github.com/W1neSkin/maplite">github.com/W1neSkin/maplite</a></p>
+    </div>
+  </footer>
+  <!-- Visits on this page are counted at w1neskin.goatcounter.com. -->
+  <script data-goatcounter="https://w1neskin.goatcounter.com/count"
+          async src="https://gc.zgo.at/count.js"></script>
+</body>
+</html>

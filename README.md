@@ -1,5 +1,7 @@
 # Cartographic Workspace
 
+Project page: [w1neskin.github.io/maplite](https://w1neskin.github.io/maplite/)
+
 A shared map for a browser and an Android phone. Several people work in one project: layers, points, lines, polygons, control points, and live positions stay together and sync through one server.
 
 The phone app is named **MapLite**.
